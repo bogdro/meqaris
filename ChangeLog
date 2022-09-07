@@ -1,3 +1,20 @@
+2022-05-07	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 0.7:
+	  Events with a duration specified instead of ending time are now
+	  supported. Other small changes.
+	* bin/meqaris: Added prototypes to subroutines, moved all subroutines
+	  to the end of the script. Add support for events with duration
+	  instead of ending time. Added "seconds" output to the initial logger.
+	  Other small improvements.
+	* bin/meqaris (is_empty): A new subroutine to check if a parameter is
+	  defined and is not an empty string.
+	* bin/meqaris (db_get_config): Return undef on error.
+	* bin/meqaris (db_version): Return an integer now.
+	* config/meqaris-log4perl.cfg: Added "seconds" output to logger.
+	* sql/meqaris-v4.pgsql: New database file.
+	* sql/meqaris-full.pgsql: Added new configuration settings.
+
 2022-05-06	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 0.5:

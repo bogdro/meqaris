@@ -32,13 +32,20 @@ use Getopt::Long;
 use MIME::Base64 qw(encode_base64);
 use MIME::Parser;
 
-my $meqaris_version = '0.5';
-my $meqaris_dbversion = 3;
+my $meqaris_version = '0.7';
+my $meqaris_dbversion = 4;
 
 # ============================ Loggers: ===================================
 
 my $logger = undef;
 my $log_level = 0;
+
+sub log_trace ($);
+sub log_debug ($);
+sub log_info ($);
+sub log_warn ($);
+sub log_error ($);
+sub log_fatal ($);
 
 eval {
 	# some default configuration
@@ -49,86 +56,22 @@ eval {
 		log4perl.appender.Screen.stderr = 1
 		#log4perl.appender.Screen.layout = Log::Log4perl::Layout::SimpleLayout
 		log4perl.appender.Screen.layout = Log::Log4perl::Layout::PatternLayout
-		log4perl.appender.Screen.layout.ConversionPattern = [%d{yyyy-MM-dd HH:mm}] %p - %m%n
+		log4perl.appender.Screen.layout.ConversionPattern = [%d{yyyy-MM-dd HH:mm:ss}] %p - %m%n
 		);
 	use Log::Log4perl;
 	Log::Log4perl->init (\$config_text);
 	$logger = Log::Log4perl->get_logger('Meqaris');
 };
 
-sub log_trace {
-
-	my $msg = shift;
-
-	if ( defined ($logger) && $logger->is_trace () ) {
-		$logger->trace ("$msg");
-	}
-	elsif ( $log_level > 5 ) {
-		print STDERR "Meqaris: trace: $msg\n";
-	}
-}
-
-sub log_debug {
-
-	my $msg = shift;
-
-	if ( defined ($logger) && $logger->is_debug () ) {
-		$logger->debug ("$msg");
-	}
-	elsif ( $log_level > 4 ) {
-		print STDERR "Meqaris: debug: $msg\n";
-	}
-}
-
-sub log_info {
-
-	my $msg = shift;
-
-	if ( defined ($logger) && $logger->is_info () ) {
-		$logger->info ("$msg");
-	}
-	elsif ( $log_level > 3 ) {
-		print STDERR "Meqaris: info: $msg\n";
-	}
-}
-
-sub log_warn {
-
-	my $msg = shift;
-
-	if ( defined ($logger) && $logger->is_warn () ) {
-		$logger->warn ("$msg");
-	}
-	elsif ( $log_level > 2 ) {
-		print STDERR "Meqaris: warn: $msg\n";
-	}
-}
-
-sub log_error {
-
-	my $msg = shift;
-
-	if ( defined ($logger) && $logger->is_error () ) {
-		$logger->error ("$msg");
-	}
-	elsif ( $log_level > 1 ) {
-		print STDERR "Meqaris: error: $msg\n";
-	}
-}
-
-sub log_fatal {
-
-	my $msg = shift;
-
-	if ( defined ($logger) && $logger->is_fatal () ) {
-		$logger->fatal ("$msg");
-	}
-	elsif ( $log_level > 0 ) {
-		print STDERR "Meqaris: fatal: $msg\n";
-	}
-}
-
 # ============================ Command line processing =======================
+
+sub val ($);
+sub is_empty ($);
+sub db_stmt ($$);
+sub db_get_config ($$);
+sub db_version ($);
+sub db_run_file ($$);
+sub db_upgrade ($);
 
 log_trace 'Reading the command line';
 
@@ -209,9 +152,10 @@ log_debug "Reading configuration file '$config_file'";
 my %cfg;
 Config::Simple->import_from($config_file, \%cfg);
 
-log_debug "Done reading configuration file '$config_file'";
+log_trace "Done reading configuration file '$config_file'";
 
-if ( defined ($cfg{'meqaris.log4perl_config_location'}) && $cfg{'meqaris.log4perl_config_location'} ne '' ) {
+if ( ! is_empty ($cfg{'meqaris.log4perl_config_location'}) ) {
+
 	log_debug "Attempting to switch Log4perl to configuration file '" . $cfg{'meqaris.log4perl_config_location'} . "'";
 	eval {
 		use Log::Log4perl;
@@ -506,6 +450,7 @@ for my $p (@parts) {
 		}
 		log_trace 'Done processing iCalendar time zones. Processing events.';
 
+		my @response_details = ();
 		# Process events:
 		EV: for my $event (@vevents) {
 
@@ -522,7 +467,10 @@ for my $p (@parts) {
 
 				# Get the event properties. ARRAY! List context required!
 				my ($dtstart) = @{$event->property('dtstart')};
-				my ($dtend) = @{$event->property('dtend')};
+				my ($dtend) = defined ($event->property('dtend'))?
+					@{$event->property('dtend')} : undef;
+				my ($duration) = defined ($event->property('duration'))?
+					@{$event->property('duration')} : undef;
 				my ($dtstamp) = defined ($event->property('dtstamp'))?
 					@{$event->property('dtstamp')} : undef;
 				my ($sequence) = defined ($event->property('sequence'))?
@@ -532,23 +480,36 @@ for my $p (@parts) {
 				log_info "Event REQUEST uid='" . val ($uid) .
 					"': dtstart='" . val ($dtstart) .
 					"', dtend='" . val ($dtend) .
+					"', duration='" . val ($duration) .
 					"', dtstamp='" . val ($dtstamp).
 					"', sequence='" . val ($sequence) .
 					"', summary='" . val ($summary) . "'";
 
 				# Get the timezone ID from the parameters:
 				my $tzid_start = $dtstart->parameters->{'TZID'};
-				my $tzid_end = $dtend->parameters->{'TZID'};
-
 				# Convert the dates to the timezone:
 				my $dt_start = DateTime::Format::ICal->parse_datetime($dtstart->value);
-				my $dt_end = DateTime::Format::ICal->parse_datetime($dtend->value);
 
-				# The datetime is changed to be 'floating'
+				# The datetime is changed to be 'floating':
 				$dt_start->set_time_zone($vtz{$tzid_start})
 					if $tzid_start and $vtz{$tzid_start};
-				$dt_end->set_time_zone($vtz{$tzid_end})
-					if $tzid_end and $vtz{$tzid_end};
+
+				my $dt_end = undef;
+				if ( defined ($dtend) ) {
+
+					my $tzid_end = $dtend->parameters->{'TZID'};
+					# Convert the dates to the timezone:
+					$dt_end = DateTime::Format::ICal->parse_datetime($dtend->value);
+					# The datetime is changed to be 'floating':
+					$dt_end->set_time_zone($vtz{$tzid_end})
+						if $tzid_end and $vtz{$tzid_end};
+				}
+				elsif ( ! defined ($duration) ) {
+
+					log_error "Event '" . val ($uid) .
+						"': malformed input: neither DTEND nor DURATION provided - ignoring";
+					next;
+				}
 
 				log_trace 'Matching attendees to events.';
 
@@ -558,6 +519,7 @@ for my $p (@parts) {
 				# otherwise or on any error.
 				for my $attendee (@{$event->property('attendee')}) {
 
+					@response_details = ();
 					# Get the raw e-mail address:
 					($reply_sender = val($attendee)) =~ s/^mailto://io;
 					my $updating = 0;
@@ -565,7 +527,7 @@ for my $p (@parts) {
 						"': trying attendee '$reply_sender'";
 					# Skip if not one of our resources:
 					if ( ! defined ($res->{$reply_sender}) ) {
-					
+
 						log_debug "Event '" . val ($uid) .
 							"': attendee '$reply_sender' doesn't match";
 						next;
@@ -578,10 +540,10 @@ for my $p (@parts) {
 						log_debug "Event '" . val ($uid) .
 							"': attendee '$reply_sender' is enabled - proceeding";
 						# Attendee found and enabled. Check if this is an update.
-						my @values = (val ($uid));
-						my @old_event = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref doesn't seem to work
+						my @values_find_del = (val ($uid));
+						my @old_event = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems not to work
 							db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
-							{ Slice => {} }, @values) };
+							{ Slice => {} }, @values_find_del) };
 						if (defined ($old_event[0]{'rr_id'}) ) {
 
 							log_info "Event '" . val ($uid) .
@@ -600,6 +562,9 @@ for my $p (@parts) {
 								$response_type = 'Declined';
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 								$calendar_reply->add_entry($event);
+								push @response_details, 'Declined for security reasons.';
+								push @response_details, "You are not the attached iCalendar's organizer.";
+								push @response_details, "The attached iCalendar's organizer is '$organizer_mail'.";
 								last EV;
 							}
 							log_debug "Event '" . val ($uid) .
@@ -613,6 +578,9 @@ for my $p (@parts) {
 								$response_type = 'Declined';
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 								$calendar_reply->add_entry($event);
+								push @response_details, 'Declined for security reasons.';
+								push @response_details, "You are not the updated event's original organizer.";
+								push @response_details, "The updated event's original organizer is '$organizer_mail'.";
 								last EV;
 							}
 							# start transaction for the DELETE + INSERT
@@ -622,8 +590,8 @@ for my $p (@parts) {
 								'delete from meqaris.meq_resource_reservations ' .
 								'where rr_id = $1');
 							if ( $stmth ) {
-								@values = ($old_event[0]{'rr_id'});
-								$stmth->execute(@values);
+								@values_find_del = ($old_event[0]{'rr_id'});
+								$stmth->execute(@values_find_del);
 								if ( $dbh->errstr ) {
 									log_error "Event '" . val ($uid) .
 										"': error deleting old event: " .
@@ -631,6 +599,8 @@ for my $p (@parts) {
 									$response_type = 'Declined';
 									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 									$calendar_reply->add_entry($event);
+									push @response_details, 'Unable to delete the event being updated.';
+									push @response_details, "The database error is:\n" . $dbh->errstr;
 									$dbh->rollback;
 									last EV;
 								} else {
@@ -644,6 +614,8 @@ for my $p (@parts) {
 								$response_type = 'Declined';
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 								$calendar_reply->add_entry($event);
+								push @response_details, 'Unable to delete the event being updated.';
+								push @response_details, "The database error is:\n" . $dbh->errstr;
 								$dbh->rollback;
 								last EV;
 							}
@@ -651,13 +623,17 @@ for my $p (@parts) {
 						# Try to insert the new event:
 						log_info "Event '" . val ($uid) .
 							"': inserting new event";
-						my $stmth = db_stmt ($dbh,
-							'insert into meqaris.meq_resource_reservations ' .
-							'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-							'values ($1, $2, $3, $4, $5, $6, $7, $8)');
-						if ( $stmth ) {
+						my $stmth = undef;
+						my @values_insert = undef;
+						if ( defined ($dt_end) ) {
 
-							my @values = (
+							log_trace 'DTEND defined - inserting interval directly.';
+
+							$stmth = db_stmt ($dbh,
+								'insert into meqaris.meq_resource_reservations ' .
+								'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+								'values ($1, $2, $3, $4, $5, $6, $7, $8)');
+							@values_insert = (
 								$res->{$reply_sender}->{'r_id'},
 								"[$dt_start, $dt_end)",
 								substr ($organizer_mail, 0, 1000),
@@ -667,7 +643,31 @@ for my $p (@parts) {
 								(defined ($sequence))? $sequence->value : 0,
 								encode_base64 ($orig_invitation)
 								);
-							$stmth->execute(@values);
+						}
+						else {
+
+							log_trace 'DTEND not defined - building interval using DURATION.';
+
+							$stmth = db_stmt ($dbh,
+								'insert into meqaris.meq_resource_reservations ' .
+								'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+								'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
+								'$4, $5, $6, $7, $8, $9)');
+							@values_insert = (
+								$res->{$reply_sender}->{'r_id'},
+								$dt_start,
+								val ($duration),
+								substr ($organizer_mail, 0, 1000),
+								substr (val ($summary), 0, 1000),
+								val ($dtstamp),
+								substr (val ($uid), 0, 1000),
+								(defined ($sequence))? $sequence->value : 0,
+								encode_base64 ($orig_invitation)
+								);
+						}
+						if ( $stmth ) {
+
+							$stmth->execute(@values_insert);
 							if ( $dbh->errstr ) {
 
 								log_error "Event '" . val ($uid) .
@@ -676,6 +676,14 @@ for my $p (@parts) {
 								# DB error - decline
 								$response_type = 'Declined';
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+								push @response_details, 'Unable to insert the event.';
+								if ( $dbh->errstr =~ /rr_interval_excl/o ) {
+									push @response_details, 'The resource is booked in the selected period.';
+								}
+								elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
+									push @response_details, 'You tried to create an event in the past.';
+								}
+								push @response_details, "The database error is:\n" . $dbh->errstr;
 								$dbh->rollback if $updating;
 							} else {
 								log_info "Event '" . val ($uid) .
@@ -692,6 +700,8 @@ for my $p (@parts) {
 							# DB error - decline
 							$response_type = 'Declined';
 							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+							push @response_details, 'Unable to insert the event.';
+							push @response_details, "The database error is:\n" . $dbh->errstr;
 							$dbh->rollback if $updating;
 						}
 					}
@@ -701,6 +711,7 @@ for my $p (@parts) {
 						# Attendee disabled - decline
 						$response_type = 'Declined';
 						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+						push @response_details, 'The resource you selected has been disabled.';
 						$dbh->rollback if $updating;
 					}
 					$calendar_reply->add_entry($event);
@@ -735,12 +746,12 @@ for my $p (@parts) {
 				}
 				log_debug "Event '" . val ($uid) .
 					"': sender '$sender_mail' is iCalendar's organizer '$organizer_mail'";
-				my @values = (val ($uid));
+				my @values_cancel = (val ($uid));
 				log_trace "Event '" . val ($uid) .
 						"': searching the database";
 				my @event = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref doesn't seem to work
 					db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
-					{ Slice => {} }, @values) };
+					{ Slice => {} }, @values_cancel) };
 				if (! defined ($event[0]{'rr_id'}) ) {
 
 					log_info "Event '" . val ($uid) .
@@ -761,8 +772,8 @@ for my $p (@parts) {
 					'delete from meqaris.meq_resource_reservations ' .
 					'where rr_id = $1');
 				if ( $stmth ) {
-					@values = ($event[0]{'rr_id'});
-					$stmth->execute(@values);
+					@values_cancel = ($event[0]{'rr_id'});
+					$stmth->execute(@values_cancel);
 					if ( $dbh->errstr ) {
 						log_error "Event '" . val ($uid) .
 							"': error deleting event: " .
@@ -785,17 +796,22 @@ for my $p (@parts) {
 
 			$calendar_reply->add_property('PRODID', "Meqaris $meqaris_version");
 			$calendar_reply->add_property('METHOD', 'REPLY');
+
+			my @mail_lines = ("$response_type: $subject\n");
+			my $reply_detail_level = db_get_config ($dbh, 'reply_detail_level');
+			if ( ! is_empty ($reply_detail_level) ) {
+				for (my $i = 0; $i < int($reply_detail_level); $i++) {
+					push @mail_lines, $response_details[$i] . "\n" if defined ($response_details[$i]);
+				}
+			}
+			push @mail_lines, ("-- \n", "Generated by Meqaris version $meqaris_version\n");
 			my $mail = MIME::Entity->build (
 				#Type => 'multipart/mixed', # set automatically
 				From => $reply_sender,
 				To => $sender,
 				Subject => substr ("$response_type: $subject", 0, 78), # length - rfc2822
 				Encoding => 'quoted-printable',
-				Data => [
-						"$response_type: $subject\n",
-						"-- \n",
-						"Generated by Meqaris version $meqaris_version\n"
-					]
+				Data => \@mail_lines
 			);
 			$mail->head->add('Comments', "Generated by Meqaris version $meqaris_version");
 			$mail->attach(
@@ -809,7 +825,7 @@ for my $p (@parts) {
 
 				# send by piping the mail to a command
 				my $mail_command = db_get_config ($dbh, 'mail_command');
-				if ( defined ($mail_command) && $mail_command ne '' ) {
+				if ( ! is_empty ($mail_command) ) {
 
 					# remove any pipe symbols first:
 					$mail_command =~ s/^\s*\|\s*//o;
@@ -834,8 +850,8 @@ for my $p (@parts) {
 					To => $sender);
 				my $mail_server = db_get_config ($dbh, 'mail_server');
 				my $mail_server_port = db_get_config ($dbh, 'mail_server_port');
-				$send_cfg{Host} = $mail_server if defined ($mail_server) && $mail_server ne '';
-				$send_cfg{Port} = $mail_server_port if defined ($mail_server_port) && $mail_server_port ne '';
+				$send_cfg{Host} = $mail_server if ! is_empty ($mail_server);
+				$send_cfg{Port} = $mail_server_port if ! is_empty ($mail_server_port);
 				$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
 
 				log_info "Sending response to '$sender' using " .
@@ -891,10 +907,18 @@ sub print_help {
 
 # ============================ val ===================================
 
-sub val {
+sub val ($) {
 
 	my $prop = shift;
 	return (defined ($prop)? $prop->value : '(undef)');
+}
+
+# ============================ is_empty ===================================
+
+sub is_empty ($) {
+
+	my $v = shift;
+	return ((defined ($v) && $v ne '')? 0 : 1);
 }
 
 # ============================ db_connect ===================================
@@ -916,7 +940,7 @@ sub db_connect {
 
 # ============================ db_stmt ===================================
 
-sub db_stmt {
+sub db_stmt ($$) {
 
 	my $dbh = shift;
 	my $sql = shift;
@@ -929,24 +953,24 @@ sub db_stmt {
 
 # ============================ db_get_config ===================================
 
-sub db_get_config {
+sub db_get_config ($$) {
 
 	my $dbh = shift;
 	my $param_name = shift;
 	my $stmth = db_stmt ($dbh, 'select c_value from meqaris.meq_config where c_name = $1');
-	return 0 unless $stmth;
+	return undef unless $stmth;
 	$stmth->execute($param_name);
 	if ( $dbh->errstr ) {
 		log_error "Database: cannot get configuration parameter '$param_name': " . $dbh->errstr . "\n";
-		return 0;
+		return undef;
 	}
-	my $db_ver = $stmth->fetchrow_arrayref;
-	return $db_ver->[0];
+	my $db_par = $stmth->fetchrow_arrayref;
+	return $db_par->[0];
 }
 
 # ============================ db_version ===================================
 
-sub db_version {
+sub db_version ($) {
 
 	my $dbh = shift;
 	my $stmth = db_stmt ($dbh, "select c_value from meqaris.meq_config where c_name = 'db_version'");
@@ -954,16 +978,16 @@ sub db_version {
 	$stmth->execute();
 	if ( $dbh->errstr ) {
 		# this CAN be a normal situation, e.g. on first install
-		log_debug "Database: ERROR: cannot get version: " . $dbh->errstr . "\n";
+		log_debug "Database: cannot get version: " . $dbh->errstr . "\n";
 		return 0;
 	}
 	my $db_ver = $stmth->fetchrow_arrayref;
-	return $db_ver->[0];
+	return int($db_ver->[0]);
 }
 
 # ============================ db_run_file ===================================
 
-sub db_run_file {
+sub db_run_file ($$) {
 
 	my $dbh = shift;
 	my $filename = shift;
@@ -989,7 +1013,7 @@ sub db_run_file {
 
 # ============================ db_upgrade ===================================
 
-sub db_upgrade {
+sub db_upgrade ($) {
 
 	my $dbh = shift;
 	my $db_ver = db_version ($dbh);
@@ -1033,4 +1057,78 @@ sub db_upgrade {
 		}
 	}
 	return 1;
+}
+
+# ============================ Loggers: ===================================
+
+sub log_trace ($) {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_trace () ) {
+		$logger->trace ($msg);
+	}
+	elsif ( $log_level > 5 ) {
+		print STDERR "Meqaris: trace: $msg\n";
+	}
+}
+
+sub log_debug ($) {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_debug () ) {
+		$logger->debug ($msg);
+	}
+	elsif ( $log_level > 4 ) {
+		print STDERR "Meqaris: debug: $msg\n";
+	}
+}
+
+sub log_info ($) {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_info () ) {
+		$logger->info ($msg);
+	}
+	elsif ( $log_level > 3 ) {
+		print STDERR "Meqaris: info: $msg\n";
+	}
+}
+
+sub log_warn ($) {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_warn () ) {
+		$logger->warn ($msg);
+	}
+	elsif ( $log_level > 2 ) {
+		print STDERR "Meqaris: warn: $msg\n";
+	}
+}
+
+sub log_error ($) {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_error () ) {
+		$logger->error ($msg);
+	}
+	elsif ( $log_level > 1 ) {
+		print STDERR "Meqaris: error: $msg\n";
+	}
+}
+
+sub log_fatal ($) {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_fatal () ) {
+		$logger->fatal ($msg);
+	}
+	elsif ( $log_level > 0 ) {
+		print STDERR "Meqaris: fatal: $msg\n";
+	}
 }

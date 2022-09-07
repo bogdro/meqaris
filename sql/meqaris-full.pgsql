@@ -119,4 +119,7 @@ insert into meqaris.meq_config (c_name, c_value, c_description)
 values ('mail_command', null, 'The command to pipe mail replies to when mail_sending_method="mail_command" (NULL = none)');
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('db_version', '3', 'The current version of the Meqaris database');
+values ('reply_detail_level', '0', 'An integer saying how much detailed will the replies be. 0 = the default.');
+
+insert into meqaris.meq_config (c_name, c_value, c_description)
+values ('db_version', '4', 'The current version of the Meqaris database');
