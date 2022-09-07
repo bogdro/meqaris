@@ -1,3 +1,25 @@
+2022-05-23	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 1.2:
+	  Recurring events with an infinite number of repetitions are now
+	  being rejected. Events that take no time (neither an end date/time
+	  nor a duration specified) are now being rejected. Fixed missing all
+	  parameters when updating a resource. Other small changes.
+	* bin/meqaris: Decline events when the number of repetitions is
+	  infinite. Decline anniversary-type events that take no time (neither
+	  DTEND nor DURATION specified). When updating a resource, check if at
+	  least one of --name, --email or --description was given. Commands
+	  that modify data are now logged at INFO level and --destroy-db is
+	  logged at WARN level. Renamed %cfg to %inicfg. Read the whole
+	  database configuration table just once for the whole run and store
+	  in %dbcfg. Display a configuration error if the Log4perl
+	  configuration INI file parameter is missing.
+	* manual/en/*.html: Fix the page icon.
+	* manual/en/readme.html: Updated reporting errors.
+	* manual/en/usage-admin.html: Fixed the link to the end-user manual.
+	  Clearly write that NULL is not the same as an empty string.
+	* manual/en/install.html: Clarify the installation directories.
+
 2022-05-19	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 1.1:

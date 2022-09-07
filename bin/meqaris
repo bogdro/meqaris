@@ -35,7 +35,7 @@ use MIME::Base64 qw(encode_base64);	# core
 use MIME::Parser;
 use Term::ANSIColor qw(:constants);	# core (5.6.0)
 
-my $meqaris_version = '1.1';
+my $meqaris_version = '1.2';
 my $meqaris_dbversion = 6;
 
 # ============================ Loggers: ===================================
@@ -71,7 +71,6 @@ sub val ($);
 sub prop_array ($$);
 sub is_empty ($);
 sub db_stmt ($$);
-sub db_get_config ($$);
 sub db_version ($);
 sub db_run_file ($$);
 sub db_upgrade ($);
@@ -156,25 +155,25 @@ if ( $version ) {
 
 log_debug "Reading configuration file '$config_file'.";
 
-my %cfg;
-Config::Simple->import_from($config_file, \%cfg);
+my %inicfg;
+Config::Simple->import_from($config_file, \%inicfg);
 
 log_trace "Done reading configuration file '$config_file'.";
 
-if ( ! is_empty ($cfg{'meqaris.log4perl_config_location'}) ) {
+if ( ! is_empty ($inicfg{'meqaris.log4perl_config_location'}) ) {
 
 	log_debug "Attempting to switch Log4perl to configuration file '"
-		. $cfg{'meqaris.log4perl_config_location'} . "'.";
+		. $inicfg{'meqaris.log4perl_config_location'} . "'.";
 	eval {
 		use Log::Log4perl;
-		Log::Log4perl->init ($cfg{'meqaris.log4perl_config_location'});
+		Log::Log4perl->init ($inicfg{'meqaris.log4perl_config_location'});
 		$logger = Log::Log4perl->get_logger('Meqaris');
 	};
 }
 
 if ( $status ) {
 
-	log_debug 'Got --status';
+	log_debug 'Command line: --status';
 
 	my $error = 0;
 	if ( Config::Simple->error() ) {
@@ -189,22 +188,22 @@ if ( $status ) {
 
 		for my $k ('meqaris.dbtype', 'meqaris.datadir' ) {
 
-			if ( ! defined ($cfg{$k}) ) {
+			if ( ! defined ($inicfg{$k}) ) {
 				print "Configuration data in file '$config_file': ",
 					BOLD, RED, 'ERROR', RESET, ": Missing: $k\n";
 				$error = 1;
 			}
 		}
-		if ( defined ($cfg{'meqaris.dbtype'}) ) {
+		if ( defined ($inicfg{'meqaris.dbtype'}) ) {
 
 			for my $k (
-				"$cfg{'meqaris.dbtype'}.username",
-				"$cfg{'meqaris.dbtype'}.password",
-				"$cfg{'meqaris.dbtype'}.dbname",
-				"$cfg{'meqaris.dbtype'}.host",
-				"$cfg{'meqaris.dbtype'}.port" ) {
+				"$inicfg{'meqaris.dbtype'}.username",
+				"$inicfg{'meqaris.dbtype'}.password",
+				"$inicfg{'meqaris.dbtype'}.dbname",
+				"$inicfg{'meqaris.dbtype'}.host",
+				"$inicfg{'meqaris.dbtype'}.port" ) {
 
-				if ( ! defined ($cfg{$k}) ) {
+				if ( ! defined ($inicfg{$k}) ) {
 					print "Configuration data in file '$config_file': ",
 						BOLD, RED, 'ERROR', RESET, ": Missing: $k\n";
 					$error = 1;
@@ -214,25 +213,28 @@ if ( $status ) {
 	}
 	if ( ! $error ) {
 
-		if ( ! is_empty ($cfg{'meqaris.log4perl_config_location'})
-			&& ! -f $cfg{'meqaris.log4perl_config_location'} ) {
+		if ( is_empty ($inicfg{'meqaris.log4perl_config_location'})
+			|| ! -f $inicfg{'meqaris.log4perl_config_location'} ) {
 
-			print "Log4Perl configuration: ", BOLD, RED, 'ERROR', RESET,
-				": '$cfg{'meqaris.log4perl_config_location'}' is not a file.\n";
+			print "Log4Perl configuration: ", BOLD, RED, 'ERROR', RESET, ': '
+				. (defined($inicfg{'meqaris.log4perl_config_location'})?
+					$inicfg{'meqaris.log4perl_config_location'} . ' is not a file.' :
+					'[meqaris] log4perl_config_location <not defined>')
+				. "\n";
 			$error = 1;
 		} else {
-			print "Log4Perl configuration: '$cfg{'meqaris.log4perl_config_location'}': ",
+			print "Log4Perl configuration: '$inicfg{'meqaris.log4perl_config_location'}': ",
 				BOLD, GREEN, 'OK', RESET, "\n";
 		}
 	}
 	if ( ! $error ) {
 
-		if ( ! -d "$cfg{'meqaris.datadir'}/sql" ) {
+		if ( ! -d "$inicfg{'meqaris.datadir'}/sql" ) {
 			print "Data directory: ", BOLD, RED, 'ERROR', RESET,
-				": '$cfg{'meqaris.datadir'}/sql' is not a directory.\n";
+				": '$inicfg{'meqaris.datadir'}/sql' is not a directory.\n";
 			$error = 1;
 		} else {
-			print "Data directory: '$cfg{'meqaris.datadir'}': ",
+			print "Data directory: '$inicfg{'meqaris.datadir'}': ",
 				BOLD, GREEN, 'OK', RESET, "\n";
 		}
 	}
@@ -269,7 +271,7 @@ if ( $status ) {
 
 if ( $create ) {
 
-	log_debug "Got --create: name='$create' email='$email' desc='$description'";
+	log_info "Command line: --create: name='$create' email='$email' desc='$description'";
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -291,7 +293,7 @@ if ( $create ) {
 
 if ( $delete ) {
 
-	log_debug "Got --delete: name='$delete'";
+	log_info "Command line: --delete: name='$delete'";
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -312,7 +314,7 @@ if ( $delete ) {
 
 if ( $destroy_db ) {
 
-	log_debug 'Got --destroy-db';
+	log_warn 'Command line: --destroy-db';
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -332,7 +334,7 @@ if ( $destroy_db ) {
 
 if ( $disable ) {
 
-	log_debug "Got --disable: name='$disable'";
+	log_info "Command line: --disable: name='$disable'";
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -353,7 +355,7 @@ if ( $disable ) {
 
 if ( $enable ) {
 
-	log_debug "Got --enable: name='$enable'";
+	log_info "Command line: --enable: name='$enable'";
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -374,7 +376,13 @@ if ( $enable ) {
 
 if ( $update ) {
 
-	log_debug "Got --update: name='$name' email='$email' desc='$description'";
+	log_info "Command line: --update: name='$name' email='$email' desc='$description'";
+	if ( $name eq '' and $email eq '' and $description eq '' ) {
+
+		log_error 'Neither a new name, a new e-mail address or a new description have been provided.';
+		print "Neither a new name, a new e-mail address or a new description have been provided.\n";
+		exit 1;
+	}
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -429,7 +437,7 @@ if ( $update ) {
 
 if ( $set ) {
 
-	log_debug "Got --set: name='$set'";
+	log_info "Command line: --set: name='$set'";
 	if ( $set eq 'db_version' ) {
 
 		log_debug 'Attempting to modify a forbidden parameter';
@@ -454,7 +462,7 @@ if ( $set ) {
 
 if ( $upgrade_db ) {
 
-	log_debug 'Got --upgrade-db';
+	log_info 'Command line: --upgrade-db';
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -469,10 +477,10 @@ if ( $upgrade_db ) {
 
 my $lock_filename = undef;
 
-# simple non-perfect colision aviodance system
+# simple non-perfect collision avoidance system
 # sleep (( ($$ % 10) + (time % 10) ) % 10);
 # 
-# $lock_filename = "$cfg{'meqaris.datadir'}/meqaris.lck";
+# $lock_filename = "$inicfg{'meqaris.datadir'}/meqaris.lck";
 # my $start_time = time;
 # 
 # log_trace 'Waiting for lock';
@@ -510,15 +518,24 @@ log_trace 'Connecting to the database';
 my $dbh = db_connect();
 if ( ! $dbh ) {
 
-	unlink $lock_filename;
+	unlink $lock_filename if defined ($lock_filename);
 	exit 2;
 }
 if ( ! db_upgrade ($dbh) ) {
 
-	unlink $lock_filename;
+	unlink $lock_filename if defined ($lock_filename);
 	exit 3;
 }
-my $parser_tmp_dir = db_get_config ($dbh, 'parser_tmp_dir');
+my $dbcfg = $dbh->selectall_hashref (db_stmt ($dbh, 
+	"select c_name, c_value from meqaris.meq_config where c_name <> 'db_version'"), 'c_name');
+
+if ( ! $dbcfg ) {
+
+	log_warn 'Cannot read configuration from the database - using defaults.'
+		. " Database error:\n" . $dbh->errstr;
+}
+
+my $parser_tmp_dir = $dbcfg->{'parser_tmp_dir'}->{'c_value'};
 $parser_tmp_dir = '/tmp' if is_empty ($parser_tmp_dir);
 
 log_trace 'Processing standard input';
@@ -530,7 +547,7 @@ my $entity = $parser->parse(\*STDIN);
 if ( ! $entity ) {
 
 	log_fatal 'Standard input parsing failed: ' . $parser->last_error;
-	unlink $lock_filename;
+	unlink $lock_filename if defined ($lock_filename);
 	exit 4;
 }
 
@@ -549,6 +566,12 @@ log_info "New message from '$sender' with subject '$subject'.";
 
 my $res = $dbh->selectall_hashref (db_stmt ($dbh, 
 	'select r_id, r_name, r_email, r_enabled from meqaris.meq_resources'), 'r_email');
+if ( ! $res ) {
+
+	log_warn 'Cannot read resources from the database - all invitations will be silently ignored.'
+		. " Database error:\n" . $dbh->errstr;
+}
+
 my $processed = 0;
 my %replied_attenddees = ();
 
@@ -685,12 +708,6 @@ for my $p (@parts) {
 						if $tzid_end and $vtz{$tzid_end};
 				}
 				if ( defined ($rdates) || defined ($rrules) ) {
-
-					if ( ! defined ($dtend) && ! defined ($duration) ) {
-
-						log_warn 'Recurring event contains no single end date (DTEND) or duration - ignoring.';
-						next;
-					}
 
 					$dates = DateTime::Set->empty_set;
 					# add all the recursion rules and dates:
@@ -940,6 +957,21 @@ for my $p (@parts) {
 
 							log_trace 'RDATE or RRULE defined - building recurring events.';
 
+							if ( ! defined ($dates->count()) ) {
+
+								log_info 'The event has an infinite number of occurrences - declining.';
+								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+								$calendar_reply->add_entry($event);
+								push @response_details, 'The event has an infinite number of occurrences. Please specify either a finite number of occurrences or an ending date.';
+								$dbh->rollback if $updating;
+								$processed = send_mail ($dbh, $calendar_reply,
+									$res->{$reply_sender}->{'r_name'} . " <$reply_sender>",
+									$sender, 'Declined', $subject,
+									\@response_details);
+
+								$replied_attenddees{$reply_sender} = 1;
+								next AT; # decline by each attendee
+							}
 							# start transaction for the INSERTs if not in one already
 							$dbh->begin_work() if ! $updating;
 							$updating = 1;
@@ -994,6 +1026,22 @@ for my $p (@parts) {
 										(defined ($sequence))? $sequence->value : 0,
 										encode_base64 ($orig_invitation)
 										);
+								}
+								else {
+									log_info 'Neither DTEND nor DURATION defined in a recurring event. Declining anniversary-type event or an event that takes no time.';
+
+									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+									push @response_details, 'This event takes no time, so it needs no resources.';
+									push @response_details, 'Neither DTEND nor DURATION specified.';
+									$dbh->rollback if $updating;
+									$calendar_reply->add_entry($event);
+									$processed = send_mail ($dbh, $calendar_reply,
+										$res->{$reply_sender}->{'r_name'} . " <$reply_sender>",
+										$sender, 'Declined', $subject,
+										\@response_details);
+
+									$replied_attenddees{$reply_sender} = 1;
+									next AT;
 								}
 								if ( $stmth ) {
 
@@ -1101,11 +1149,11 @@ for my $p (@parts) {
 								);
 						}
 						else {
-							log_error 'Malformed input - none of: DTEND, DURATION, RDATE or RRULE defined.';
+							log_info 'None of: DTEND, DURATION, RDATE or RRULE defined. Declining anniversary-type event or an event that takes no time.';
 
 							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-							push @response_details, 'Malformed input.';
-							push @response_details, 'None of: DTEND, DURATION, RDATE or RRULE defined.';
+							push @response_details, 'This event takes no time, so it needs no resources.';
+							push @response_details, 'None of: DTEND, DURATION, RDATE or RRULE specified.';
 							$dbh->rollback if $updating;
 							$calendar_reply->add_entry($event);
 							$processed = send_mail ($dbh, $calendar_reply,
@@ -1302,7 +1350,7 @@ sub print_help {
 			"--license|licence\t\tShows the license information\n" .
 			"--name <name>\t\t\tSpecifies a new name for the meeting resource when updating\n" .
 			"--set <name>\t\t\tSpecifies the name of the configuration setting to modify\n" .
-			"--status\t\t\tShows the operatibility status of Meqaris\n" .
+			"--status\t\t\tShows the operability status of Meqaris\n" .
 			"--update <name>\t\t\tUpdate a meeting resource with the given name\n" .
 			"--upgrade-db\t\t\tRun the necessary Meqaris database structure upgrade scripts\n" .
 			"--value <value>\t\t\tSpecifies the new value of the configuration setting to modify using --set\n" .
@@ -1328,7 +1376,7 @@ sub send_mail ($$$$$$@) {
 	$calendar_reply->add_property('METHOD', 'REPLY');
 
 	my @mail_lines = ("$response_type: $subject\n");
-	my $reply_detail_level = db_get_config ($dbh, 'reply_detail_level');
+	my $reply_detail_level = $dbcfg->{'reply_detail_level'}->{'c_value'};
 	if ( ! is_empty ($reply_detail_level) ) {
 		for (my $i = 0; $i < int($reply_detail_level); $i++) {
 			push @mail_lines, $response_details->[$i] . "\n" if defined ($response_details->[$i]);
@@ -1350,11 +1398,11 @@ sub send_mail ($$$$$$@) {
 		Encoding => 'base64'
 	);
 	log_debug "Response mail:\n=====\n" . $mail->stringify . "\n=====";
-	my $mail_sending_method = db_get_config ($dbh, 'mail_sending_method');
+	my $mail_sending_method = $dbcfg->{'mail_sending_method'}->{'c_value'};
 	if ( defined ($mail_sending_method) && $mail_sending_method eq 'mail_command' ) {
 
 		# send by piping the mail to a command
-		my $mail_command = db_get_config ($dbh, 'mail_command');
+		my $mail_command = $dbcfg->{'mail_command'}->{'c_value'};
 		if ( ! is_empty ($mail_command) ) {
 
 			# remove any pipe symbols first:
@@ -1379,8 +1427,8 @@ sub send_mail ($$$$$$@) {
 		my %send_cfg = (
 			MailFrom => $from,
 			To => $to);
-		my $mail_server = db_get_config ($dbh, 'mail_server');
-		my $mail_server_port = db_get_config ($dbh, 'mail_server_port');
+		my $mail_server = $dbcfg->{'mail_server'}->{'c_value'};
+		my $mail_server_port = $dbcfg->{'mail_server_port'}->{'c_value'};
 		$send_cfg{Host} = $mail_server if ! is_empty ($mail_server);
 		$send_cfg{Port} = $mail_server_port if ! is_empty ($mail_server_port);
 		$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
@@ -1425,13 +1473,13 @@ sub is_empty ($) {
 
 sub db_connect {
 
-	my $dbtype = $cfg{'meqaris.dbtype'};
+	my $dbtype = $inicfg{'meqaris.dbtype'};
 	my $dbh = DBI->connect(
-		'dbi:Pg:dbname=' . $cfg{"$dbtype.dbname"} .
-		';host=' . $cfg{"$dbtype.host"} .
-		';port=' . $cfg{"$dbtype.port"}, 
-		$cfg{"$dbtype.username"},
-		$cfg{"$dbtype.password"},
+		'dbi:Pg:dbname=' . $inicfg{"$dbtype.dbname"} .
+		';host=' . $inicfg{"$dbtype.host"} .
+		';port=' . $inicfg{"$dbtype.port"}, 
+		$inicfg{"$dbtype.username"},
+		$inicfg{"$dbtype.password"},
 		{AutoCommit => 1, RaiseError => 0, PrintError => 0});
 	if ( ! $dbh ) {
 		log_fatal 'Database: cannot connect: ' . $DBI::errstr;
@@ -1450,23 +1498,6 @@ sub db_stmt ($$) {
 		log_fatal 'Database: cannot create statement: ' . $dbh->errstr;
 	}
 	return $stmth;
-}
-
-# ============================ db_get_config ===================================
-
-sub db_get_config ($$) {
-
-	my $dbh = shift;
-	my $param_name = shift;
-	my $stmth = db_stmt ($dbh, 'select c_value from meqaris.meq_config where c_name = $1');
-	return undef unless $stmth;
-	$stmth->execute($param_name);
-	if ( $dbh->errstr ) {
-		log_error "Database: cannot get configuration parameter '$param_name': " . $dbh->errstr;
-		return undef;
-	}
-	my $db_par = $stmth->fetchrow_arrayref;
-	return $db_par->[0];
 }
 
 # ============================ db_version ===================================
@@ -1528,7 +1559,7 @@ sub db_upgrade ($) {
 
 			# new database - just run the full script (in a transaction)
 			$dbh->begin_work();
-			if (! db_run_file ($dbh, "$cfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
+			if (! db_run_file ($dbh, "$inicfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
 
 				log_fatal "Can't update database version to $meqaris_dbversion.";
 				$dbh->rollback();
@@ -1543,7 +1574,7 @@ sub db_upgrade ($) {
 			for (my $i = $db_ver + 1; $i <= $meqaris_dbversion; $i++) {
 
 				$dbh->begin_work();
-				if (! db_run_file ($dbh, "$cfg{'meqaris.datadir'}/sql/meqaris-v$i.pgsql") ) {
+				if (! db_run_file ($dbh, "$inicfg{'meqaris.datadir'}/sql/meqaris-v$i.pgsql") ) {
 
 					log_fatal "Can't update database version from $db_ver to $meqaris_dbversion";
 					$dbh->rollback();
