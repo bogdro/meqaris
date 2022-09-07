@@ -111,6 +111,71 @@ You can use the provided 'scripts/mkdump.sh' script to make a database backup
 
 -----------------------------------------------------------------------
 
+Configuration file
+------------------
+
+Meqaris uses an INI file to hold the primary configuration. The file's
+ default syntax is
+
+[meqaris]
+dbtype=postgresql
+datadir=/var/lib/meqaris
+log4perl_config_location=/var/lib/meqaris/meqaris-log4perl.cfg
+
+[postgresql]
+username=meqaris
+password=meqaris-pass
+dbname=meqaris
+host=127.0.0.1
+port=5432
+
+The "dbtype" parameter in the [meqaris] section holds the type of the
+ database and the name of the database settings' section.
+
+The "datadir" parameter in the [meqaris] section tells where the Meqaris'
+ data files (SQL files) are.
+
+The "log4perl_config_location" parameter in the [meqaris] section gives the
+ location of the configuration file for Log::Log4perl.
+
+The "username" parameter in the [postgresql] section gives the database
+ username for the database.
+
+The "password" parameter in the [postgresql] section gives the database
+ password for the provided username for the database.
+
+The "dbname" parameter in the [postgresql] section gives the name of the
+ database to connect to.
+
+The "host" parameter in the [postgresql] section gives the hostname or an
+ IP address of the database to connect to.
+
+The "port" parameter in the [postgresql] section gives the port number of
+ the database to connect to.
+
+-----------------------------------------------------------------------
+
+Configuration table in the database
+-----------------------------------
+
+Meqaris uses also a database table to hold some of its configuration. The
+ table is called "meq_config" and is present in the "meqaris" schema.
+
+The table has 3 columns:
+- parameter's name - c_name
+- parameter's value - c_value
+- parameter's description - c_description
+
+Currently, the following user-modifiable parameters are supported:
+- c_name = mail_server: The address of the mail server to use (the default
+  value is NULL meaning to use the default mail server guessing by the
+  Mail::Internet Perl module).
+- c_name = mail_server_port The port on the mail server to use (the default
+  value is NULL meaning to use the default mail server port by the
+  Mail::Internet Perl module).
+
+-----------------------------------------------------------------------
+
 Troubleshooting
 ---------------
 

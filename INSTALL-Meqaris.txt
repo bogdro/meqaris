@@ -7,6 +7,9 @@
 Initial steps - most are one-time
 ---------------------------------
 
+- The Perl language interpreter and all the Perl modules required by Meqaris
+  must be installed.
+
 - The PostgreSQL database server must be installed, including the btree_gist
   extension binary file (you may need to install the 'contrib' package, or
   similar).
@@ -119,6 +122,7 @@ You need to edit the meqaris.ini file to set the proper values for database
 [meqaris]
 dbtype=postgresql
 datadir=/path/to/meqaris/data
+log4perl_config_location=/path/to/meqaris/data/meqaris-log4perl.cfg
 
 [postgresql]
 username=meqaris

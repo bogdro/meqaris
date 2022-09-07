@@ -1,5 +1,5 @@
 /*
- * Meqaris - the full database script.
+ * Meqaris - the v1 database script.
  *
  * Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
  *
@@ -106,11 +106,5 @@ comment on column meqaris.meq_config.c_name is 'Configuration parameter name';
 comment on column meqaris.meq_config.c_value is 'Configuration parameter value';
 comment on column meqaris.meq_config.c_description is 'Configuration parameter description';
 
-insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_server', null, 'The address of the mail server to use (NULL = default)');
-
-insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_server_port', null, 'The port on the mail server to use (NULL = default)');
-
-insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('db_version', '2', 'The current version of the Meqaris database');
+insert into meq_config (c_name, c_value, c_description)
+values ('db_version', '1', 'The current version of the Meqaris database');

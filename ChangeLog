@@ -1,3 +1,30 @@
+2022-05-05	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 0.3:
+	  Declining invitations to disabled resources. Event cancellation is
+	  now supported. Safer database calls. Greatly improved logging. New
+	  parameters in the INI file and in the database. Other fixes.
+	  Documentation updates.
+	* bin/meqaris: Declining invitations to disabled resources. Call
+	  substr() for the values put in the database to not go over the
+	  length limit. Use more prepared statements. Improved logging using
+	  Log::Log4perl whose configuration file's location can now be put in
+	  the Meqaris' INI file (must be accessible before the database in
+	  case of database problems). Fixed getting the organizer's e-mail.
+	  Chomp()ing the sender and subject.
+	* bin/meqaris (log_*): New logger subroutines.
+	* bin/meqaris (db_get_config): A new subroutine to get a configuration
+	  setting from the database.
+	* config/meqaris-log4perl.cfg: Added a simple Log4perl configuration.
+	* sql/meqaris-v2.pgsql: New database file.
+	* sql/meqaris-full.pgsql: added new configuration settings.
+	* Makefile: Added installing the meqaris-log4perl.cfg file.
+	* README: Mentioned Log::Log4perl as an optional module.
+	* INSTALL-Meqaris.txt: Added that Perl and the required modules must
+	  be installed.
+	* Meqaris-user-manual.txt: Added information about Meqaris' settings
+	  in the INI file and in the database.
+
 2022-05-01	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 0.1:

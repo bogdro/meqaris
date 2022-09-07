@@ -29,7 +29,10 @@ Requirements:
   DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
   DateTime::Event::Recurrence, DateTime::Set, Params::Validate,
-  Text::vFile::asData)
+  Text::vFile::asData).
+
+  The Log::Log4perl module is optional, but can be of great heal with logging
+  when problems occur.
 
 - actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
 

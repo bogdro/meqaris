@@ -32,10 +32,105 @@ use Getopt::Long;
 use MIME::Base64 qw(encode_base64);
 use MIME::Parser;
 
-my $meqaris_version = '0.1';
-my $meqaris_dbversion = 1;
+my $meqaris_version = '0.3';
+my $meqaris_dbversion = 2;
+
+# ============================ Loggers: ===================================
+
+my $logger = undef;
+my $log_level = 0;
+
+eval {
+	# some default configuration
+	my $config_text = q(
+		log4perl.rootLogger = TRACE, Screen
+
+		log4perl.appender.Screen        = Log::Log4perl::Appender::Screen
+		log4perl.appender.Screen.stderr = 1
+		#log4perl.appender.Screen.layout = Log::Log4perl::Layout::SimpleLayout
+		log4perl.appender.Screen.layout = Log::Log4perl::Layout::PatternLayout
+		log4perl.appender.Screen.layout.ConversionPattern = [%d{yyyy-MM-dd HH:mm}] %p - %m%n
+		);
+	use Log::Log4perl;
+	Log::Log4perl->init (\$config_text);
+	$logger = Log::Log4perl->get_logger('Meqaris');
+};
+
+sub log_trace {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_trace () ) {
+		$logger->trace ("$msg");
+	}
+	elsif ( $log_level > 5 ) {
+		print STDERR "Meqaris: trace: $msg\n";
+	}
+}
+
+sub log_debug {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_debug () ) {
+		$logger->debug ("$msg");
+	}
+	elsif ( $log_level > 4 ) {
+		print STDERR "Meqaris: debug: $msg\n";
+	}
+}
+
+sub log_info {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_info () ) {
+		$logger->info ("$msg");
+	}
+	elsif ( $log_level > 3 ) {
+		print STDERR "Meqaris: info: $msg\n";
+	}
+}
+
+sub log_warn {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_warn () ) {
+		$logger->warn ("$msg");
+	}
+	elsif ( $log_level > 2 ) {
+		print STDERR "Meqaris: warn: $msg\n";
+	}
+}
+
+sub log_error {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_error () ) {
+		$logger->error ("$msg");
+	}
+	elsif ( $log_level > 1 ) {
+		print STDERR "Meqaris: error: $msg\n";
+	}
+}
+
+sub log_fatal {
+
+	my $msg = shift;
+
+	if ( defined ($logger) && $logger->is_fatal () ) {
+		$logger->fatal ("$msg");
+	}
+	elsif ( $log_level > 0 ) {
+		print STDERR "Meqaris: fatal: $msg\n";
+	}
+}
 
 # ============================ Command line processing =======================
+
+log_trace 'Reading the command line';
 
 Getopt::Long::Configure('ignore_case', 'ignore_case_always');
 
@@ -77,22 +172,24 @@ if ( !GetOptions (
 	exit 1;
 }
 
+log_trace 'Processing command line arguments';
+
 if ( $lic ) {
 	print
 		"Meqaris (Meeting Equipment and Room Invitation System)\n" .
-			"- software that allows booking meeting rooms and other resources\n" .
-			" using e-mail invitations\n" .
-			"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
-			"  This program is free software: you can redistribute it and/or modify\n" .
-			"  it under the terms of the GNU Affero General Public License as published by\n" .
-			"  the Free Software Foundation, either version 3 of the License, or\n" .
-			"  (at your option) any later version.\n\n" .
-			"  This program is distributed in the hope that it will be useful,\n" .
-			"  but WITHOUT ANY WARRANTY; without even the implied warranty of\n" .
-			"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n" .
-			"  GNU Affero General Public License for more details.\n\n" .
-			"  You should have received a copy of the GNU Affero General Public License\n" .
-			"  along with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
+		"- software that allows booking meeting rooms and other resources\n" .
+		" using e-mail invitations\n" .
+		"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
+		"  This program is free software: you can redistribute it and/or modify\n" .
+		"  it under the terms of the GNU Affero General Public License as published by\n" .
+		"  the Free Software Foundation, either version 3 of the License, or\n" .
+		"  (at your option) any later version.\n\n" .
+		"  This program is distributed in the hope that it will be useful,\n" .
+		"  but WITHOUT ANY WARRANTY; without even the implied warranty of\n" .
+		"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n" .
+		"  GNU Affero General Public License for more details.\n\n" .
+		"  You should have received a copy of the GNU Affero General Public License\n" .
+		"  along with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
 		;
 	exit 0;
 }
@@ -107,14 +204,30 @@ if ( $version ) {
 	exit 0;
 }
 
+log_debug "Reading configuration file '$config_file'";
+
 my %cfg;
 Config::Simple->import_from($config_file, \%cfg);
 
+log_debug "Done reading configuration file '$config_file'";
+
+if ( defined ($cfg{'meqaris.log4perl_config_location'}) && $cfg{'meqaris.log4perl_config_location'} ne '' ) {
+	log_debug "Attempting to switch Log4perl to configuration file '" . $cfg{'meqaris.log4perl_config_location'} . "'";
+	eval {
+		use Log::Log4perl;
+		Log::Log4perl->init ($cfg{'meqaris.log4perl_config_location'});
+		$logger = Log::Log4perl->get_logger('Meqaris');
+	};
+}
+
 if ( $status ) {
+
+	log_debug "Got --status";
 
 	my $error = 0;
 	if ( Config::Simple->error() ) {
-		print "Configuration file '$config_file': ERROR: " . Config::Simple->error() . "\n";
+		print "Configuration file '$config_file': ERROR: "
+			. Config::Simple->error() . "\n";
 		$error = 1;
 	} else {
 		print "Configuration file '$config_file': OK\n";
@@ -145,31 +258,39 @@ if ( $status ) {
 	if ( ! $error ) {
 
 		my $dbh = db_connect();
-		exit 2 unless $dbh;
-		print "Database connection: OK\n";
-		my $db_ver = db_version ($dbh);
-		if ( $meqaris_dbversion == $db_ver ) {
-			print "Database version: OK\n";
-		} else {
-			print "Database version: ERROR: expected $meqaris_dbversion, got $db_ver\n" .
-				"You may need to run 'meqaris --upgrade-db'.\n";
+		if ( ! $dbh ) {
+			print "Database connection: ERROR\n";
 			$error = 2;
 		}
-		$dbh->disconnect;
+		if ( ! $error ) {
+			print "Database connection: OK\n";
+			my $db_ver = db_version ($dbh);
+			if ( $meqaris_dbversion == $db_ver ) {
+				print "Database version: OK\n";
+			} else {
+				print "Database version: ERROR: expected $meqaris_dbversion, got $db_ver\n" .
+					"You may need to run 'meqaris --upgrade-db'.\n";
+				$error = 2;
+			}
+			$dbh->disconnect;
+		}
 	}
 	exit $error;
 }
 
 if ( $create ) {
 
+	log_debug "Got --create: name='$create' email='$email' desc='$description'";
+
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
 	exit 2 unless db_upgrade ($dbh);
 	my $stmth = db_stmt ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
 	exit 2 unless $stmth;
-	$stmth->execute($create, $email, $description);
+	$stmth->execute(substr ($create, 0, 1000),
+		substr ($email, 0, 1000), substr ($description, 0, 1000));
 	if ( $dbh->errstr ) {
-		print "Database: ERROR: cannot create resource: " . $dbh->errstr . "\n";
+		log_error "Database: cannot create resource: " . $dbh->errstr . "\n";
 		exit 2;
 	}
 	$dbh->disconnect;
@@ -178,6 +299,8 @@ if ( $create ) {
 
 if ( $delete ) {
 
+	log_debug "Got --delete: name='$delete'";
+
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
 	exit 2 unless db_upgrade ($dbh);
@@ -185,7 +308,7 @@ if ( $delete ) {
 	exit 2 unless $stmth;
 	$stmth->execute($delete);
 	if ( $dbh->errstr ) {
-		print "Database: ERROR: cannot delete resource: " . $dbh->errstr . "\n";
+		log_error "Database: cannot delete resource: " . $dbh->errstr . "\n";
 		exit 2;
 	}
 	$dbh->disconnect;
@@ -194,13 +317,15 @@ if ( $delete ) {
 
 if ( $destroy_db ) {
 
+	log_debug "Got --destroy-db";
+
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
 	my $stmth = db_stmt ($dbh, 'drop schema meqaris cascade');
 	exit 2 unless $stmth;
 	$stmth->execute();
 	if ( $dbh->errstr ) {
-		print "Database: ERROR: cannot destroy the database schema: " . $dbh->errstr . "\n";
+		log_error "Database: cannot destroy the database schema: " . $dbh->errstr . "\n";
 		exit 2;
 	}
 	$dbh->disconnect;
@@ -209,6 +334,8 @@ if ( $destroy_db ) {
 
 if ( $disable ) {
 
+	log_debug "Got --disable: name='$disable'";
+
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
 	exit 2 unless db_upgrade ($dbh);
@@ -216,7 +343,7 @@ if ( $disable ) {
 	exit 2 unless $stmth;
 	$stmth->execute($disable);
 	if ( $dbh->errstr ) {
-		print "Database: ERROR: cannot disable resource: " . $dbh->errstr . "\n";
+		log_error "Database: cannot disable resource: " . $dbh->errstr . "\n";
 		exit 2;
 	}
 	$dbh->disconnect;
@@ -225,6 +352,8 @@ if ( $disable ) {
 
 if ( $enable ) {
 
+	log_debug "Got --enable: name='$enable'";
+
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
 	exit 2 unless db_upgrade ($dbh);
@@ -232,7 +361,7 @@ if ( $enable ) {
 	exit 2 unless $stmth;
 	$stmth->execute($enable);
 	if ( $dbh->errstr ) {
-		print "Database: ERROR: cannot enable resource: " . $dbh->errstr . "\n";
+		log_error "Database: cannot enable resource: " . $dbh->errstr . "\n";
 		exit 2;
 	}
 	$dbh->disconnect;
@@ -240,6 +369,8 @@ if ( $enable ) {
 }
 
 if ( $update ) {
+
+	log_debug "Got --update: name='$name' email='$email' desc='$description'";
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -251,7 +382,7 @@ if ( $update ) {
 	if ( $name ne '' ) {
 
 		$sql .= "r_name = \$$par_cnt";
-		push @values, $name;
+		push @values, substr ($name, 0, 1000);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -261,7 +392,7 @@ if ( $update ) {
 			$sql .= ', ';
 		}
 		$sql .= "r_email = \$$par_cnt";
-		push @values, $email;
+		push @values, substr ($email, 0, 1000);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -271,7 +402,7 @@ if ( $update ) {
 			$sql .= ', ';
 		}
 		$sql .= "r_description = \$$par_cnt";
-		push @values, $description;
+		push @values, substr ($description, 0, 1000);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -282,7 +413,7 @@ if ( $update ) {
 	exit 2 unless $stmth;
 	$stmth->execute(@values);
 	if ( $dbh->errstr ) {
-		print "Database: ERROR: cannot update resource: " . $dbh->errstr . "\n";
+		log_error "Database: cannot update resource: " . $dbh->errstr . "\n";
 		exit 2;
 	}
 	$dbh->disconnect;
@@ -290,6 +421,8 @@ if ( $update ) {
 }
 
 if ( $upgrade_db ) {
+
+	log_debug "Got --upgrade-db";
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -300,39 +433,63 @@ if ( $upgrade_db ) {
 
 # ============================ Input processing ===================================
 
+log_trace 'Processing standard input';
+
 my $parser = new MIME::Parser;
 $parser->output_dir('/tmp');
 $parser->output_prefix('meqaris-msg');
 my $entity = $parser->parse(\*STDIN) or die "Standard input parsing failed\n";
 
+log_trace 'Standard input processed';
+
 my @parts = $entity->parts;
 
 my $sender = $entity->head->get('From', 0);
+chomp $sender;
 my $subject = $entity->head->get('Subject', 0);
+chomp $subject;
 my $reply_sender = '';
 my $response_type = '';
+
+log_info "New message from '$sender' with subject '$subject'";
 
 my $dbh = db_connect();
 exit 2 unless $dbh;
 exit 2 unless db_upgrade ($dbh);
 
-my $res = $dbh->selectall_hashref ('select r_id, r_name, r_email, r_enabled from meqaris.meq_resources', 'r_email');
+my $res = $dbh->selectall_hashref (db_stmt ($dbh, 
+	'select r_id, r_name, r_email, r_enabled from meqaris.meq_resources'), 'r_email');
 my $processed = 0;
+
+log_trace 'Processing message parts';
 
 for my $p (@parts) {
 
-	if ( $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics' ) {
+	if ( $p->mime_type eq 'text/calendar'
+		|| $p->mime_type eq 'application/ics' ) {
+
+		log_info "Message from '$sender' with subject '$subject' contains an iCalendar";
 
 		# bodyhandle() runs the decoding, as_string() doesn't
 		my $orig_invitation = $p->bodyhandle->as_string;
+		log_debug "Message from '$sender' with subject '$subject' contains this iCalendar:\n" .
+			"-----\n$orig_invitation\n------";
+
 		my $ical = Data::ICal->new(data => $orig_invitation);
 
 		# Check the method property. ARRAY! List context required!
 		my ($method) = @{$ical->property('METHOD')};
-		next if $method->value ne 'REQUEST';
+		if ( (! defined ($method)) or ($method->value ne 'REQUEST' and $method->value ne 'CANCEL') ) {
+
+			log_info "Message from '$sender' with subject '$subject'" .
+				" contains an iCalendar, but its method '" .
+				(defined ($method)? $method->value : '?') . "' is unsupported. Skipping";
+			next;
+		}
 
 		my $calendar_reply = Data::ICal->new(rfc_strict => 1);
 		# Read the time zones, if any:
+		log_trace 'Processing iCalendar time zones';
 		my (%vtz, @vevents);
 		for my $entry (@{$ical->entries}) {
 
@@ -347,80 +504,206 @@ for my $p (@parts) {
 				$vtz{$dtz->name} = $dtz;
 			}
 		}
+		log_trace 'Done processing iCalendar time zones. Processing events.';
 
-		# Add timezone information to events:
+		# Process events:
 		EV: for my $event (@vevents) {
 
-			# Get the meeting properties. ARRAY! List context required!
-			my ($dtstart) = @{$event->property('dtstart')};
-			my ($dtend) = @{$event->property('dtend')};
-			my ($uid) = @{$event->property('uid')};
 			my ($organizer) = @{$event->property('organizer')};
-			my ($dtstamp) = $event->property('dtstamp')? @{$event->property('dtstamp')} : undef;
-			my ($sequence) = $event->property('sequence')? @{$event->property('sequence')} : undef;
-			my ($summary) = @{$event->property('summary')};
-			$organizer =~ s/^mailto://io;
+			my $organizer_mail = undef;
+			($organizer_mail = $organizer->value) =~ s/^mailto://io if defined ($organizer);
+			my ($uid) = @{$event->property('uid')};
 
-			# Get the timezone ID from the parameters:
-			my $tzid_start = $dtstart->parameters->{'TZID'};
-			my $tzid_end = $dtend->parameters->{'TZID'};
+			log_info "Got event with uid='" . (defined ($uid)? $uid->value : '?') .
+				"' and organizer='" . (defined ($organizer)? $organizer->value : '?') . "'";
+			if ( $method->value eq 'REQUEST' ) {
 
-			# Convert the dates to the timezone:
-			my $dt_start = DateTime::Format::ICal->parse_datetime($dtstart->value);
-			my $dt_end = DateTime::Format::ICal->parse_datetime($dtend->value);
+				log_trace "Event '" . $uid->value . "': REQUEST";
 
-			# The datetime is changed to be 'floating'
-			$dt_start->set_time_zone($vtz{$tzid_start}) if $tzid_start and $vtz{$tzid_start};
-			$dt_end->set_time_zone($vtz{$tzid_end}) if $tzid_end and $vtz{$tzid_end};
+				# Get the event properties. ARRAY! List context required!
+				my ($dtstart) = @{$event->property('dtstart')};
+				my ($dtend) = @{$event->property('dtend')};
+				my ($dtstamp) = $event->property('dtstamp')?
+					@{$event->property('dtstamp')} : undef;
+				my ($sequence) = $event->property('sequence')?
+					@{$event->property('sequence')} : undef;
+				my ($summary) = @{$event->property('summary')};
 
-			# Find an attendee matching one of our resources
-			# and set the reply as ACCEPTED if the timeslot is free
-			# (if the database allows the insert) and DECLINED
-			# otherwise or on any error.
-			for my $attendee (@{$event->property('attendee')}) {
+				log_info "Event REQUEST uid='" . (defined ($uid)? $uid->value : '?') .
+					"': dtstart='" . (defined ($dtstart)? $dtstart->value : '?') .
+					"', dtend='" . (defined ($dtend)? $dtend->value : '?') .
+					"', dtstamp='" . (defined ($dtstamp)? $dtstamp->value : '?') .
+					"', sequence='" . (defined ($sequence)? $sequence->value : '?') .
+					"', summary='" . (defined ($summary)? $summary->value : '?') . "'";
 
-				# Get the raw e-mail address:
-				($reply_sender = $attendee->value) =~ s/^mailto://io;
-				# Skip if not one of our resources:
-				next if ! defined ($res->{$reply_sender});
-				# Attendee found - try to insert the meeting:
-				my $stmth = db_stmt ($dbh,
-					'insert into meqaris.meq_resource_reservations ' .
-					'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-					'values ($1, $2, $3, $4, $5, $6, $7, $8)');
-				if ( $stmth ) {
+				# Get the timezone ID from the parameters:
+				my $tzid_start = $dtstart->parameters->{'TZID'};
+				my $tzid_end = $dtend->parameters->{'TZID'};
 
-					my @values = (
-						$res->{$reply_sender}->{'r_id'},
-						"[$dt_start, $dt_end)",
-						$organizer->value,
-						$summary->value,
-						(defined ($dtstamp))? $dtstamp->value : undef,
-						$uid->value,
-						(defined ($sequence))? $sequence->value : 0,
-						encode_base64 ($orig_invitation)
-						);
-					$stmth->execute(@values);
-					if ( $dbh->errstr ) {
+				# Convert the dates to the timezone:
+				my $dt_start = DateTime::Format::ICal->parse_datetime($dtstart->value);
+				my $dt_end = DateTime::Format::ICal->parse_datetime($dtend->value);
 
-						# DB error - reject
+				# The datetime is changed to be 'floating'
+				$dt_start->set_time_zone($vtz{$tzid_start})
+					if $tzid_start and $vtz{$tzid_start};
+				$dt_end->set_time_zone($vtz{$tzid_end})
+					if $tzid_end and $vtz{$tzid_end};
+
+				log_trace 'Matching attendees to events.';
+
+				# Find an attendee matching one of our resources
+				# and set the reply as ACCEPTED if the timeslot is free
+				# (if the database allows the insert) and DECLINED
+				# otherwise or on any error.
+				for my $attendee (@{$event->property('attendee')}) {
+
+					# Get the raw e-mail address:
+					($reply_sender = $attendee->value) =~ s/^mailto://io;
+					log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': trying attendee '$reply_sender'";
+					# Skip if not one of our resources:
+					if ( ! defined ($res->{$reply_sender}) ) {
+					
+						log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+							"': attendee '$reply_sender' doesn't match";
+						next;
+					}
+					log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': attendee '$reply_sender' found";
+					# decline if resource is disabled:
+					if ( $res->{$reply_sender}->{'r_enabled'} ) {
+
+						log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+							"': inserting new event";
+						# Attendee found and enabled - try to insert the event:
+						my $stmth = db_stmt ($dbh,
+							'insert into meqaris.meq_resource_reservations ' .
+							'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+							'values ($1, $2, $3, $4, $5, $6, $7, $8)');
+						if ( $stmth ) {
+
+							my @values = (
+								$res->{$reply_sender}->{'r_id'},
+								"[$dt_start, $dt_end)",
+								substr ($organizer_mail, 0, 1000),
+								substr ($summary->value, 0, 1000),
+								(defined ($dtstamp))? $dtstamp->value : undef,
+								substr ((defined ($uid)? $uid->value : ''), 0, 1000),
+								(defined ($sequence))? $sequence->value : 0,
+								encode_base64 ($orig_invitation)
+								);
+							$stmth->execute(@values);
+							if ( $dbh->errstr ) {
+
+								log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+									"': error inserting new event: " .
+									$dbh->errstr . " - declining";
+								# DB error - decline
+								$response_type = 'Declined';
+								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+							} else {
+								log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+									"': event inserted";
+								$response_type = 'Accepted';
+								$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+							}
+						}
+						else {
+							log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+								"': error inserting new event: " .
+								$dbh->errstr . " - declining";
+							# DB error - decline
+							$response_type = 'Declined';
+							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+						}
+					}
+					else {
+						log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+							"': resource disabled - declining";
+						# Attendee disabled - decline
 						$response_type = 'Declined';
 						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-					} else {
-						$response_type = 'Accepted';
-						$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
 					}
+					$calendar_reply->add_entry($event);
+					last EV;
+				} # for my $attendee
+			} # $method->value eq 'REQUEST'
+			elsif ( $method->value eq 'CANCEL' ) {
+
+				log_info "Event '" . (defined ($uid)? $uid->value : '?') . "': CANCEL";
+
+				# Cancellation request - check if the event
+				# exists, check if sender is the organiser
+				# and if the organiser in the cancellation
+				# request is the organiser of the original event
+				if ( ! defined ($uid) ) {
+
+					log_info "Event '?': UID not defined, cannot delete - ignoring";
+					next;
 				}
-				else {
-					# DB error - reject
-					$response_type = 'Declined';
-					$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+				log_trace 'Comparing sender and organizer e-mail addresses';
+				my $sender_mail;
+				if ( $sender =~ /<([^>]+)>/o ) {
+					$sender_mail = $1;
+				} else {
+					$sender_mail = $sender;
 				}
-				$calendar_reply->add_entry($event);
-				last EV;
-			}
+				if ( $sender_mail ne $organizer_mail ) {
+
+					log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': sender '$sender_mail' is not iCalendar's organizer '$organizer_mail' - ignoring";
+					next;
+				}
+				log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+					"': sender '$sender_mail' is iCalendar's organizer '$organizer_mail'";
+				my @values = ($uid->value);
+				log_trace "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': searching the database";
+				my @event = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref doesn't seem to work
+					db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
+					{ Slice => {} }, @values) };
+				if (! defined ($event[0]{'rr_id'}) ) {
+
+					log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': not found in database - ignoring: " . $dbh->errstr;
+					next;
+				}
+				log_trace "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': found in the database";
+				$event[0]{'rr_organiser'} =~ s/^mailto://io;
+				if ( $sender_mail ne $event[0]{'rr_organiser'} ) {
+
+					log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': sender '$sender_mail' is not the same organizer as in the database '" .
+						$event[0]{'rr_organiser'} . "' - ignoring";
+					next;
+				}
+				my $stmth = db_stmt ($dbh,
+					'delete from meqaris.meq_resource_reservations ' .
+					'where rr_id = $1');
+				if ( $stmth ) {
+					@values = ($event[0]{'rr_id'});
+					$stmth->execute(@values);
+					if ( $dbh->errstr ) {
+						log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+							"': error deleting event: " .
+							$dbh->errstr;
+					} else {
+						log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+							"': event deleted successfully";
+					}
+				} else {
+					log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+						"': error deleting event: " .
+						$dbh->errstr;
+				}
+
+			} # $method->value eq 'CANCEL'
 		}
 		if ( $response_type ne '' ) {
+
+			log_debug "Preparing response to '$sender'";
 
 			$calendar_reply->add_property('PRODID', "Meqaris $meqaris_version");
 			$calendar_reply->add_property('METHOD', 'REPLY');
@@ -442,13 +725,24 @@ for my $p (@parts) {
 				Type => 'text/calendar; method=REPLY',
 				Encoding => 'base64'
 			);
-			$mail->smtpsend(
+			log_debug "Response mail:\n=====\n" . $mail->stringify . "\n=====";
+			my %send_cfg = (
 				MailFrom => $reply_sender,
-				To => $sender
-				);
+				To => $sender);
+			my $mail_server = db_get_config ($dbh, 'mail_server');
+			my $mail_server_port = db_get_config ($dbh, 'mail_server_port');
+			$send_cfg{Host} = $mail_server if defined ($mail_server) && $mail_server ne '';
+			$send_cfg{Port} = $mail_server_port if defined ($mail_server_port) && $mail_server_port ne '';
+			$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
+
+			log_trace "Sending response to '$sender' using " .
+				"mail_server:port='" .
+				(defined ($mail_server)? $mail_server : '(default)') .
+				':' . (defined ($mail_server_port)? $mail_server_port : '(default port)') ."'";
+			$mail->smtpsend(%send_cfg);
 			$processed = 1;
 		}
-	}
+	}	# $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics'
 	# Process just one invitation per each e-mail. Various mail clients
 	# may sen the same invitation using different MIME types, so reply
 	# to just the first one successfully processed and stop processing
@@ -501,7 +795,7 @@ sub db_connect {
 		$cfg{'postgresql.password'},
 		{AutoCommit => 1, RaiseError => 0, PrintError => 0});
 	if ( ! $dbh ) {
-		print "Database connection: ERROR: cannot connect: " . $DBI::errstr . "\n";
+		log_fatal "Database: cannot connect: " . $DBI::errstr . "\n";
 	}
 	return $dbh;
 }
@@ -514,9 +808,26 @@ sub db_stmt {
 	my $sql = shift;
 	my $stmth = $dbh->prepare ($sql);
 	if ( ! $stmth ) {
-		print "Database: ERROR: cannot create statement: " . $dbh->errstr . "\n";
+		log_fatal "Database: cannot create statement: " . $dbh->errstr . "\n";
 	}
 	return $stmth;
+}
+
+# ============================ db_get_config ===================================
+
+sub db_get_config {
+
+	my $dbh = shift;
+	my $param_name = shift;
+	my $stmth = db_stmt ($dbh, 'select c_value from meqaris.meq_config where c_name = $1');
+	return 0 unless $stmth;
+	$stmth->execute($param_name);
+	if ( $dbh->errstr ) {
+		log_error "Database: cannot get configuration parameter '$param_name': " . $dbh->errstr . "\n";
+		return 0;
+	}
+	my $db_ver = $stmth->fetchrow_arrayref;
+	return $db_ver->[0];
 }
 
 # ============================ db_version ===================================
@@ -529,7 +840,7 @@ sub db_version {
 	$stmth->execute();
 	if ( $dbh->errstr ) {
 		# this CAN be a normal situation, e.g. on first install
-		#print "Database: ERROR: cannot get version: " . $dbh->errstr . "\n";
+		log_debug "Database: ERROR: cannot get version: " . $dbh->errstr . "\n";
 		return 0;
 	}
 	my $db_ver = $stmth->fetchrow_arrayref;
@@ -546,7 +857,7 @@ sub db_run_file {
 	open (my $f, '<', $filename);
 	if ( ! defined ($f) ) {
 
-		print "Database upgrade: ERROR: cannot open file '$filename': $!\n";
+		log_fatal "Database upgrade: cannot open file '$filename': $!\n";
 		return 0;
 	}
 	my @lines = <$f>;
@@ -556,7 +867,7 @@ sub db_run_file {
 	return 0 unless $stmth;
 	$stmth->execute();
 	if ( $dbh->errstr ) {
-		print "Database upgrade: ERROR: cannot execute file '$filename': " . $dbh->errstr . "\n";
+		log_fatal "Database upgrade: cannot execute file '$filename': " . $dbh->errstr . "\n";
 		return 0;
 	}
 	return 1;
@@ -577,7 +888,7 @@ sub db_upgrade {
 			$dbh->begin_work();
 			if (! db_run_file ($dbh, "$cfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
 
-				print  "Can't update database version to $meqaris_dbversion.\n";
+				log_fatal "Can't update database version to $meqaris_dbversion.\n";
 				$dbh->rollback();
 				return 0;
 			}
@@ -592,7 +903,7 @@ sub db_upgrade {
 				$dbh->begin_work();
 				if (! db_run_file ($dbh, "$cfg{'meqaris.datadir'}/sql/meqaris-v$i.pgsql") ) {
 
-					print  "Can't update database version from $db_ver to $meqaris_dbversion\n";
+					log_fatal "Can't update database version from $db_ver to $meqaris_dbversion\n";
 					$dbh->rollback();
 					return 0;
 				}
@@ -601,7 +912,7 @@ sub db_upgrade {
 		}
 		elsif ($db_ver > $meqaris_dbversion) {
 
-			print "Database version $db_ver is newer than the expected version $meqaris_dbversion.\n" .
+			log_warn "Database version $db_ver is newer than the expected version $meqaris_dbversion.\n" .
 				"The application may behave improperly.\n" .
 				"You can continue or leave and install the correct application version.\n";
 			return 0;

@@ -21,7 +21,7 @@
 #
 
 NAME = meqaris
-VER = 0.1
+VER = 0.3
 
 RMDIR = /bin/rm -fr
 # when using '-p', no error is generated when the directory exists
@@ -63,6 +63,8 @@ install:
 	$(CHMOD) 755 $(BINDIR)/meqaris
 	$(COPY) sql/*.pgsql $(DATADIR)/$(NAME)/sql
 	$(CHMOD) 644 $(DATADIR)/$(NAME)/sql/*.pgsql
+	$(COPY) config/meqaris-log4perl.cfg $(DATADIR)/$(NAME)/
+	$(CHMOD) 644 $(DATADIR)/$(NAME)/meqaris-log4perl.cfg
 	$(COPY) config/meqaris.ini $(CONFDIR)/
 	$(CHMOD) 644 $(CONFDIR)/meqaris.ini
 
