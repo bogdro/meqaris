@@ -3,6 +3,17 @@
 			User's Manual
 -----------------------------------------------------------------------
 
+The manual has been migrated to the HTML version.
+Please see the "manual" directory.
+
+-----------------
+Project home page
+-----------------
+
+https://meqaris.sourceforge.io/
+
+-----------------------------------------------------------------------
+
 To get simple help on the command line, run
 
 	meqaris --help
@@ -70,7 +81,9 @@ Once resources are added, you can start booking them - just send your
  invitations with the resources' configured e-mail addresses just like you
  would send invitations to other meeting participants.
 
-Warning: right now, only one Meqaris resource per e-mail is supported.
+Warning: you can put more than one Meqaris resource in the same invitation,
+ but you may receive multiple replies in that case. The resources get properly
+ booked, though.
 
 To later modify the resource, if needed, use the --update parameter, passing
  the name of the resource to modify and the new parameters:
@@ -95,6 +108,18 @@ To permanently delete a resource, run
 
 After this, you need to re-create the resource in order to use it again.
  Resources which have meetings booked (even past) cannot be deleted right now.
+
+To modify a setting in the Meqaris database, run
+
+	meqaris --set <name> --value <new_value>
+
+e.g.
+
+	meqaris --set mail_server --value 127.0.0.1
+
+To set the value to NULL, run just
+
+	meqaris --set <name>
 
 To completely delete the Meqaris data and database structures in the
  database, run
@@ -170,13 +195,19 @@ The "port" parameter in the [postgresql] section gives the port number of
 Configuration table in the database
 -----------------------------------
 
-Meqaris uses also a database table to hold some of its configuration. The
- table is called "meq_config" and is present in the "meqaris" schema.
+Meqaris uses also a database table to hold some of its configuration.
 
-The table has 3 columns:
-- parameter's name - c_name
-- parameter's value - c_value
-- parameter's description - c_description
+To modify a setting in the Meqaris database, run
+
+	meqaris --set <name> --value <new_value>
+
+e.g.
+
+	meqaris --set mail_server --value 127.0.0.1
+
+To set the value to NULL, run just
+
+	meqaris --set <name>
 
 Currently, the following user-modifiable parameters are supported:
 

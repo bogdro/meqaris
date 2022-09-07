@@ -3,6 +3,12 @@
 			Installation instructions
 -----------------------------------------------------------------------
 
+-----------------
+Project home page
+-----------------
+
+https://meqaris.sourceforge.io/
+
 ---------------------------------
 Initial steps - most are one-time
 ---------------------------------
@@ -87,27 +93,38 @@ Application installation
 
 - Copy bin/meqaris to a directory expected to contain binaries, like /usr/bin
 
-- copy the contents of the 'sql' directory to a directory expected to contain
-  application data files, like /var/lib/meqaris/
+- Edit config/meqaris.ini to match your directories and database settings
+  (see below)
 
-- copy config/meqaris.ini to a directory expected to contain configuration
+- Edit config/meqaris-log4perl.cfg and choose your log file's location
+
+- Copy the the whole 'sql' directory and the config/meqaris-log4perl.cfg file
+  to a directory expected to contain application data files, like
+  /var/lib/meqaris/. The 'DATADIR/meqaris' directory must be writeable for
+  your mail server.
+
+- Copy config/meqaris.ini to a directory expected to contain configuration
   files, like /etc
 
-Alternatively, if you have the 'make' program and some common Unix/Linux
-  utilities, you can run 'make install', passing the prefix of the target
-  directory. Examples:
+- Copy the manual to a place suitable for documentation, like /usr/share/doc
 
-	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib
+Alternatively, if you have the 'make' program and some common Linux
+ utilities, you can run 'make install', passing the the target directories.
+ Examples:
+
+	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib \
+		DOCDIR=/usr/share/doc
 	make install BINDIR=$HOME/tools/meqaris/bin \
 		CONFDIR=$HOME/tools/meqaris/etc \
-		DATADIR=$HOME/tools/meqaris/data
+		DATADIR=$HOME/tools/meqaris/data \
+		DOCDIR=$HOME/tools/meqaris/doc
 
 All the above directories and their parent directories must be reachable by
  your mail server.
 
 The necessary database structures will be created by the application itself
-while operating. You can also choose to run the database installation/upgrade
-scripts yourself by running
+ while operating. You can also choose to run the database installation/upgrade
+ scripts yourself by running
 
 	meqaris --upgrade-db
 
@@ -183,6 +200,8 @@ To uninstall, if needed:
 
 - remove the meqaris.ini file from the directory you installed it to
 
+- remove the meqaris-log4perl.cfg file from the directory you installed it to
+
 - remove the application SQL file(s) from the directory you installed them to
 
 - delete the application's database - run as 'postgres':
@@ -193,3 +212,9 @@ To uninstall, if needed:
 
 	dropuser meqaris
 
+-----------------------------------------------------------------
+
+Project home page
+-----------------
+
+https://meqaris.sourceforge.io/

@@ -6,6 +6,7 @@
  * This file is part of Meqaris (Meeting Equipment and Room Invitation System),
  *  software that allows booking meeting rooms and other resources using
  *  e-mail invitations.
+ * Meqaris homepage: https://meqaris.sourceforge.io/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +29,7 @@ createdb meqaris
 create schema meqaris;
 comment on schema meqaris is 'The main schema for the Meqaris application';
 
-/* Depends on the database version, enabled by default on newer:
+/* Enabled by default since 9.0+ and we require 9.2 anyway:
 create language plpgsql;
 */
 
@@ -70,7 +71,7 @@ create table meqaris.meq_resource_reservations
 	rr_organiser varchar(1000) not null,
 	rr_summary varchar(1000),
 	rr_dtstamp timestamp with time zone,
-	rr_uid varchar(1000) constraint rr_uid_unique unique,
+	rr_uid varchar(1000) not null,
 	rr_seq int not null default 0 constraint rr_seq_nonneg check (rr_seq >= 0),
 	rr_data text,
 	constraint rr_interval_in_future check (lower(rr_interval) > now() and upper(rr_interval) > now()),
@@ -91,6 +92,9 @@ comment on column meqaris.meq_resource_reservations.rr_data is 'Reservation data
 
 create index meq_resource_reservations_fk on meq_resource_reservations (rr_r_id);
 comment on index meq_resource_reservations_fk is 'The index for the reservation''s resource foreign key';
+
+create index rr_uid_index on meq_resource_reservations (rr_uid);
+comment on index rr_uid_index is 'The index for searching reservations by UID';
 
 ------------------ CONFIGURATION ------------------
 
@@ -125,4 +129,4 @@ insert into meqaris.meq_config (c_name, c_value, c_description)
 values ('parser_tmp_dir', '/tmp', 'The path to a temporary directory for files with message parts. Default = /tmp. NULL means use the default.');
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('db_version', '5', 'The current version of the Meqaris database');
+values ('db_version', '6', 'The current version of the Meqaris database');

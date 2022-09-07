@@ -1,0 +1,280 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="en">
+<HEAD profile="http://www.w3.org/2005/10/profile">
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-1">
+<META HTTP-EQUIV="Content-Language"   CONTENT="en">
+<META http-equiv="Content-Style-Type" content="text/css">
+<LINK rel="stylesheet" href="../rsrc/css/meqaris.css" type="text/css">
+<link rel="icon" type="image/svg+xml" href="../rsrc/meqaris-icon.png">
+
+<TITLE> Installation - Meqaris </TITLE>
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Meqaris - Meeting Equipment and Room Invitation System">
+<META NAME="Keywords" CONTENT="Free Software, GPL, Linux, Meqaris">
+<META NAME="Language" CONTENT="en">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+</HEAD><BODY>
+
+<h1 class="hdr">Meqaris - Installation instructions</h1>
+
+<hr>
+<h2 class="c">Initial steps - most are one-time</h2>
+
+<ol>
+ <li>Install <a href="https://www.perl.org/" hreflang="en">Perl</a>,
+  along with the following modules (available from 
+  <a href="https://metacpan.org" hreflang="en">CPAN / metacpan</a>):
+  <ul>
+   <li>Config::Simple,</li>
+   <li>Data::ICal,</li>
+   <li>DateTime::Format::ICal,</li>
+   <li>DateTime::Set,</li>
+   <li>DateTime::TimeZone::ICal,</li>
+   <li>DBD::Pg,</li>
+   <li>DBI,</li>
+   <li>Getopt::Long,</li>
+   <li>MIME::Base64,</li>
+   <li>MIME::Parser,</li>
+  </ul>
+  <p>
+  with all their dependencies (the list may include but not be limited to:
+  Module::Install, Test::NoWarnings, Test::LongString, Class::Accessor,
+  DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
+  Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
+  DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
+  </p>
+  <p>
+  The Log::Log4perl module is optional, but can be of great help with logging
+  when problems occur.
+  </p>
+  <p>
+  Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
+  </p>
+ </li>
+
+ <li>A <a href="https://www.postgresql.org/" hreflang="en">PostgreSQL</a> database server, version 9.2 or newer, must be running.<br>
+	On a Linux system, you would do one of:
+	<ul>
+	 <li>login to the system as the database user <code>postgres</code> (you can
+		do <code>su - postgres</code> as <code>root</code> to login to that account on Linux) and run:
+	  <pre>	pg_ctl start</pre>
+	  </li>
+	 <li>login as <code>root</code> and run:
+	  <pre>	systemctl start postgresqlXX (XX being the version)</pre>
+	  </li>
+	 <li>login as <code>root</code> and run:
+	  <pre>	service postgresql start</pre>
+	  </li></ul>
+	</li>
+
+ <li>A mail (SMTP) server must be running.<br>
+	On a Linux system with <a href="https://www.postfix.org/" hreflang="en">Postfix</a>, you would do one of (as <code>root</code>):
+	<pre>
+	systemctl start postfix</pre>
+	<pre>
+	service postfix start</pre>
+	</li>
+
+ <li>A database user must be created within the database server.<br>
+	With PostgreSQL, you would login to the system as the database user <code>postgres</code> and run:
+	<pre>
+	createuser -P meqaris</pre>
+	It's advised for the user to be the owner of the database that will be created.<br>
+	It's easiest to create a user with the same name as the system user name and
+	create the database as the system user.
+	<br><br></li>
+
+ <li>A logical database must be created within the database server.<br>
+	With PostgreSQL, you would login to the system as the database user <code>postgres</code> and run:
+	<pre>
+	createdb -O meqaris meqaris</pre>
+	(for the specified user to be the database owner)
+	</li>
+
+ <li>Database access rules must be created within the database server unless you wish to leave the default rules.<br>
+	With PostgreSQL, you would do (as the database user <code>postgres</code> or <code>root</code>):
+	<pre>
+	cp /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf-backup
+	echo local meqaris meqaris scram-sha-256 &gt;&gt; /var/lib/pgsql/data/pg_hba.conf
+	echo host all all 127.0.0.1/32 scram-sha-256 &gt;&gt; /var/lib/pgsql/data/pg_hba.conf</pre>
+	(Note the double "<code>&gt;&gt;</code>" - it's <em class="important">CRUCIAL</em> to use double "<code>&gt;&gt;</code>",
+	a single "<code>&gt;</code>" would <em class="important">OVERWRITE</em> the target file).<br>
+	With older PostgreSQL versions, replace <code>scram-sha-256</code> with <code>md5</code>.<br>
+	If you'll need to access the database from another computer:
+	<ul>
+	 <li>a line similar to the <code>host all all 127.0.0.1/32 scram-sha-256</code>
+	  should be added to pg_hba.conf, containing the correct IP address</li>
+	 <li>firewall rules may need to be adjusted</li>
+	 <li>the <code>/etc/hosts.allow</code> file (tcpwrappers) may need to be adjusted</li>
+	</ul></li>
+
+ <li>After changing the access rules for the database server, restart it.<br>
+	With Linux with PostgreSQL, you would do one of:
+	<ul>
+	 <li>login to the system as the database user <code>postgres</code> and run:
+	  <pre>	pg_ctl reload</pre>
+	 </li>
+	 <li>login as <code>root</code> and run:
+	  <pre>	systemctl restart postgresqlXX (XX being the version)</pre>
+	 </li>
+	 <li>login as <code>root</code> and run:
+	  <pre>	service postgresql restart</pre>
+	 </li></ul></li>
+
+</ol>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Installation</h2>
+
+<ol>
+ <li>Choose 4 paths:
+  <ul>
+   <li><code>BINDIR</code> - a directory for the Meqaris program (like <code>/usr/bin</code>)</li>
+   <li><code>CONFDIR</code> - a directory for the Meqaris' configuration (like <code>/etc</code>)</li>
+   <li><code>DATADIR</code> - a directory for the Meqaris' data files (like <code>/var/lib/meqaris</code>)</li>
+   <li><code>DOCDIR</code> - a directory for the Meqaris' documentation (like <code>/usr/share/doc/meqaris</code>)</li>
+  </ul></li>
+
+ <li>Copy <code>bin/meqaris</code> to <code>BINDIR</code></li>
+
+ <li>Edit <code>config/meqaris.ini</code> to match your directories and database settings (see below)</li>
+
+ <li>Edit <code>config/meqaris-log4perl.cfg</code> and choose your log file's location</li>
+
+ <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR</code>.
+  The <code>DATADIR/meqaris</code> directory must be writeable for your mail server.</li>
+
+ <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code></li>
+
+</ol>
+
+<p>
+Alternatively, if you have the <code>make</code> program and some common Linux
+utilities, you can run <code>make install</code>, passing the target
+directories. Examples:</p>
+ <pre>
+	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib DOCDIR=/usr/share/doc
+	make install BINDIR=$HOME/tools/meqaris/bin \
+		CONFDIR=$HOME/tools/meqaris/etc \
+		DATADIR=$HOME/tools/meqaris/data \
+		DOCDIR=$HOME/tools/meqaris/doc</pre>
+<p>
+All the above directories and their parent directories must be reachable by
+your mail server.
+</p>
+<p>
+The log file (<code>/var/log/meqaris.log</code> by default) must be created writeable for
+your mail server. Alternatively, the directory which would contain it must be
+writeable by your mail server.
+</p>
+<p>
+The necessary database structures will be created by the application itself
+while operating. You can also choose to run the database installation/upgrade
+scripts yourself by running
+</p>
+	<pre>	meqaris --upgrade-db</pre>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Meqaris configuration</h2>
+
+<p>
+You need to edit the <code>meqaris.ini</code> file to set the proper values for database
+access in the <code>[postgresql]</code> section and your chosen application data files'
+directory in the <code>[meqaris]</code> section under:
+</p>
+<pre>
+	[meqaris]
+	dbtype=postgresql
+	datadir=/path/to/meqaris/data
+	log4perl_config_location=/path/to/meqaris/data/meqaris-log4perl.cfg
+
+	[postgresql]
+	username=meqaris
+	password=meqaris-pass
+	dbname=meqaris
+	host=127.0.0.1
+	port=5432</pre>
+
+<p>
+Make sure that the <code>datadir</code> directory, the <code>log4perl_config_location</code> file
+and the actual log file have the right permission so that Meqaris, which
+will run under the mail server's privileges, has the right access to all of
+those locations.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Mail server configuration</h2>
+
+<p>
+Consult your mail server manual about how to make it send e-mails addressed
+to your resources (rooms, etc.) to the Meqaris script and how to accept the
+replies.
+</p>
+<p>
+For Postfix, you can edit the <code>/etc/postfix/aliases</code> file and add the right
+command there. It must being with the "pipe" symbol - "|" - so that the
+Meqaris script receives the mail on the so-called "standard input".
+</p>
+<p>
+Assuming you want a "room 1" alias and everything is installed in the default
+paths, the simplest entry in the <code>/etc/postfix/aliases</code> file could be:
+</p>
+<pre>	room1: |"meqaris"</pre>
+
+<p>
+Assuming you want a "room 1" alias and everything is installed <em class="important">NOT</em> in the
+default paths, the most complicated entry in the <code>/etc/postfix/aliases</code> file could be:
+</p>
+<pre>
+	room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"</pre>
+<p>
+For a password-less, local-only mail submission, add this to your
+<code>/etc/postfix/main.cf</code> file:
+</p>
+<pre>
+	inet_interfaces = localhost
+	inet_protocols = all
+	mynetworks_style = host
+	smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated reject_unauth_destination
+	smtp_sasl_auth_enable = no
+	smtp_tls_security_level =
+	smtpd_sasl_auth_enable = no
+	smtpd_tls_security_level = </pre>
+<p>
+Restart the Postfix server (or reload its configuration) afterwards.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Uninstallation</h2>
+
+<p>To uninstall, if needed:</p>
+
+<ul>
+ <li>remove the <code>meqaris</code> script from the directory you installed it to</li>
+
+ <li>remove the <code>meqaris.ini</code> file from the directory you installed it to</li>
+
+ <li>remove the <code>meqaris-log4perl.cfg</code> file from the directory you installed it to</li>
+
+ <li>remove the application SQL file(s) from the directory you installed them to</li>
+
+ <li>delete the application's database - run as <code>postgres</code>:
+
+	<pre>	dropdb meqaris</pre>
+ </li>
+ <li>delete the application's database user - run as <code>postgres</code>:
+
+	<pre>	dropuser meqaris</pre>
+ </li>
+
+</body></html>

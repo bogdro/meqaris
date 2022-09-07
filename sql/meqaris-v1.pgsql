@@ -6,6 +6,7 @@
  * This file is part of Meqaris (Meeting Equipment and Room Invitation System),
  *  software that allows booking meeting rooms and other resources using
  *  e-mail invitations.
+ * Meqaris homepage: https://meqaris.sourceforge.io/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +29,7 @@ createdb meqaris
 create schema meqaris;
 comment on schema meqaris is 'The main schema for the Meqaris application';
 
-/* Depends on the database version, enabled by default on newer:
+/* Enabled by default since 9.0+ and we require 9.2 anyway:
 create language plpgsql;
 */
 

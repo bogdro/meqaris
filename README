@@ -1,6 +1,6 @@
 This is the README file for Meqaris.
 
-Meqaris (Meeting Equipment and Room Invitation System) is software that
+Meqaris (Meeting Equipment and Room Invitation System) is a system that
  allows booking meeting rooms and other resources (like mobile whiteboards,
  projectors or conference sets) using the same e-mail invitations that
  are used to invite participants to meetings.
@@ -18,6 +18,7 @@ Requirements:
   * Config::Simple,
   * Data::ICal,
   * DateTime::Format::ICal,
+  * DateTime::Set,
   * DateTime::TimeZone::ICal,
   * DBD::Pg,
   * DBI,
@@ -28,26 +29,26 @@ Requirements:
   Module::Install, Test::NoWarnings, Test::LongString, Class::Accessor,
   DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
-  DateTime::Event::Recurrence, DateTime::Set, Params::Validate,
-  Text::vFile::asData).
+  DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
 
-  The Log::Log4perl module is optional, but can be of great heal with logging
+  The Log::Log4perl module is optional, but can be of great help with logging
   when problems occur.
 
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
 
 - a PostgreSQL database server (https://www.postgresql.org/), version 9.2
-  or newer, with the PL/pgSQL language installed and the btree_gist
-  extension binary file (you may need to install the 'contrib' package, or
-  similar).
+  or newer, with the btree_gist extension binary file (you may need to
+  install the 'contrib' package, or similar).
 
 Author: Bogdan Drozdowski, bogdro (at) users . sourceforge . net
 
 License: GNU AGPL version 3 or newer.
 
+Meqaris homepage: https://meqaris.sourceforge.io/
+
 ----------------------------------------------------------------
 
-Various versions of Meqaris were successfully used with the following
+Various versions of Meqaris have been successfully used with the following
  components in the following versions:
 
 1. PostgreSQL:

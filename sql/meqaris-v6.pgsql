@@ -1,5 +1,5 @@
 /*
- * Meqaris - the v3 database script.
+ * Meqaris - the v6 database script.
  *
  * Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
  *
@@ -27,11 +27,11 @@ Required for indices, triggers and their comments.
 */
 set schema 'meqaris';
 
-insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_sending_method', null, 'The method to send mail replies: NULL=default, Mail::Internet, mail_command');
+alter table meqaris.meq_resource_reservations drop constraint rr_uid_unique;
+alter table meqaris.meq_resource_reservations alter column rr_uid set not null;
 
-insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_command', null, 'The command to pipe mail replies to when mail_sending_method="mail_command" (NULL = none)');
+create index rr_uid_index on meq_resource_reservations (rr_uid);
+comment on index rr_uid_index is 'The index for searching reservations by UID';
 
-update meqaris.meq_config set c_value = '3'
+update meqaris.meq_config set c_value = '6'
 where c_name = 'db_version';

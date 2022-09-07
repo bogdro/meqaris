@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="en">
+<HEAD profile="http://www.w3.org/2005/10/profile">
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-1">
+<META HTTP-EQUIV="Content-Language"   CONTENT="en">
+<META http-equiv="Content-Style-Type" content="text/css">
+<LINK rel="stylesheet" href="../rsrc/css/meqaris.css" type="text/css">
+<link rel="icon" type="image/svg+xml" href="../rsrc/meqaris-icon.png">
+
+<TITLE> User's manual - Meqaris </TITLE>
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Meqaris - Meeting Equipment and Room Invitation System">
+<META NAME="Keywords" CONTENT="Free Software, GPL, Linux, Meqaris">
+<META NAME="Language" CONTENT="en">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+</HEAD><BODY>
+
+<h1 class="hdr">Meqaris - User's manual</h1>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">What is Meqaris</h2>
+
+<p>
+Meqaris (Meeting Equipment and Room Invitation
+System) is a system that allows booking resources using e-mail invitations.
+</p>
+
+<p>
+It is a command-line-driven application for system administrators to
+operate. Users interact with Meqaris only by sending e-mail invitations to
+special e-mail addresses created by the system administrator.
+</p>
+
+<p>
+Meqaris is <em class="important">NOT</em> an e-mail client program.
+</p>
+<p>
+Meqaris is <em class="important">NOT</em> a plug-in, extension or other add-on to an e-mail client program.
+</p>
+<p>
+Meqaris is <em class="important">NOT</em> an e-mail server program.
+</p>
+<p>
+Meqaris is a program that an e-mail server interacts with.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Creating invitations</h2>
+
+<p>
+In this manual, I'm going to use the <a href="https://www.thunderbird.net" hreflang="en">Mozilla
+Thunderbird</a> mail client.
+</p>
+
+<p>
+We begin by enabling the "Calendar" tab in Thunderbird. To do that, go to the
+"Events and Tasks" menu and click "Calendar" or press <kbd>Ctrl+Shift+C</kbd>.
+If you don't see the menu, upgrade your Thunderbird or install the "Lightning"
+add-on.
+</p>
+
+<p>
+On the "Calendar" tab, click the "New event" button:
+</p>
+<p class="c">
+<img src="rsrc/cal-new-event.png" alt="[New event]">
+</p>
+
+<p>
+In the "New event" window, select the date and time, fill all the usual
+details of your meeting, and click the "Invite Attendees" button:
+</p>
+<p class="c">
+<img src="rsrc/event-invite.png" alt="[Invite]">
+</p>
+
+<p>
+In the "Invite Attendees" window, type the e-mail addresses of the resources
+you wish to use for your meeting. In the below example, it is a meeting room.<br>
+You should get the e-mail addresses from some kind of address book or from
+your local Meqaris administrator.
+</p>
+<p class="c">
+<img src="rsrc/attendee-list.png" alt="[Attendee list]">
+</p>
+<p>
+You can choose one of the 3 following roles to book the resource: "Chair", "Required Attendee" or
+"Optional Attendee", by clicking the first icon in the attendee's row.<br>
+If you choose "Non Participant", the resource will
+<em class="important">NOT</em> be booked and you will
+<em class="important">NOT</em> get a reply. Your invitation will simply
+be ignored.
+</p>
+<p class="c">
+<img src="rsrc/attendee-role.png" alt="[Attendee role]">
+</p>
+
+<p>
+You can choose any of the 4 attendee types: "Individual", "Group", "Resource"
+or "Room", by clicking the second icon in the attendee's row.
+All types are supported by Meqaris.
+</p>
+<p class="c">
+<img src="rsrc/attendee-type.png" alt="[Attendee type]">
+</p>
+
+<p>
+<em class="important">NOTE</em>: Inviting more than one Meqaris resource
+in the same invitation is supported, but you may receive multiple replies
+in such case (even declining). The resource is properly booked, though.<br>
+It is, however, recommended, to book all resources first, one by one, and once
+you have resources booked, invite participants to the meeting.
+</p>
+
+<p>
+Once all attendees are selected, click the "OK" button.
+</p>
+
+<p>
+When all the meeting details are filled and participants selected, click the
+"Send And Close" button in the event window to send the invitations.
+Make sure that the "Notify attendees" check-box at the bottom is selected.
+</p>
+<p class="c">
+<img src="rsrc/event-send.png" alt="[Send event]">
+</p>
+
+<p>
+Now you can await responses from the resources you've booked.<br>
+A positive reply will have a green plus sign by the resource and the
+word "Accepted" in the mail subject and body:
+</p>
+<p class="c">
+<img src="rsrc/event-accepted.png" alt="[Accepted]">
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Cancelling events</h2>
+
+<p>
+To cancel an event, right-click it in the "Calendar" tab in
+Thunderbird and select "Delete Event" (or simply click the event
+and press the <kbd>Delete</kbd> button).<br>
+In the "Email Notification" question window be sure to click "Yes"
+so that Meqaris will receive the cancellation notice and will remove
+the booking from its database. Otherwise, nobody will be able to book
+that resource for a period covering any part of the cancelled event.
+</p>
+<p class="c">
+<img src="rsrc/event-cancel.png" alt="[Cancel]">
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Troubleshooting</h2>
+
+<p>
+For troubleshooting, read the replies you get from Meqaris or the
+mail server (in case of severe errors).<br>
+In the replies are not explanatory, refer to your local Meqaris administrator
+to look in Meqaris logs or the logs of the mail server.
+</p>
+
+</body></html>

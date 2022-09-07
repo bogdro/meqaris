@@ -1,0 +1,336 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="en">
+<HEAD profile="http://www.w3.org/2005/10/profile">
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-1">
+<META HTTP-EQUIV="Content-Language"   CONTENT="en">
+<META http-equiv="Content-Style-Type" content="text/css">
+<LINK rel="stylesheet" href="../rsrc/css/meqaris.css" type="text/css">
+<link rel="icon" type="image/svg+xml" href="../rsrc/meqaris-icon.png">
+
+<TITLE> Administrator's manual - Meqaris </TITLE>
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Meqaris - Meeting Equipment and Room Invitation System">
+<META NAME="Keywords" CONTENT="Free Software, GPL, Linux, Meqaris">
+<META NAME="Language" CONTENT="en">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+</HEAD><BODY>
+
+<h1 class="hdr">Meqaris - Administrator's manual</h1>
+
+<hr>
+<h2 class="c">The command line</h2>
+
+<p>
+Meqaris is a command-line-driven application. You configure the system by
+issuing commands on the command-line and use the application by providing
+parameters and e-mail input on the command line and through the standard
+input.
+</p>
+
+<p>To get simple help on the command line, run</p>
+
+	<pre>	meqaris --help</pre>
+
+<p>
+Meqaris uses an INI file to hold the primary configuration, like database
+access settings, and a PostgreSQL database to hold the meeting resources
+(rooms and equipment), the booked meetings/events and some of the
+configuration.
+</p>
+<p>
+To override the default configuration file path, use the <code>--conf</code> parameter,
+passing the full path to the configuration file:
+</p>
+
+	<pre>	meqaris --conf /path/to/meqaris.ini</pre>
+
+<p>
+You can pass this parameter to each of the commands Meqaris supports.
+</p>
+<p>
+To check if the configuration file is correct, you can run the
+</p>
+	<pre>	meqaris --status</pre>
+
+<p>
+command. It should eventually display something similar to:
+</p>
+<pre>
+	Configuration file '/path/to/meqaris.ini': OK
+	Data directory: '/path/to/meqaris/data': OK
+	Database connection: OK
+	Database version: OK</pre>
+
+<p>
+On ANSI-enabled terminals, the statuses will be shown in colour. You can set
+the environment variable <code>ANSI_COLORS_DISABLED</code> to disable this, e.g.
+</p>
+
+	<pre>	ANSI_COLORS_DISABLED=1 meqaris --status</pre>
+
+<p>
+Each database modification action causes Meqaris to check if the database
+version is the version expected by the application. If not, the required
+database upgrade scripts are run. You can also perform the database upgrade
+manually by running the
+</p>
+
+	<pre>	meqaris --upgrade-db</pre>
+
+<p>
+command and check the status afterwards.
+</p>
+<p>
+To begin booking meeting resources, you need to create those resources in the
+Meqaris system. To do that, use the <code>--create</code> parameter
+(and remember to properly quote or escape the parameters):
+</p>
+<pre>
+	meqaris --create 'Room 100' --description 'Room 100, first floor'
+		--email 'room100@yourdomain'
+
+	meqaris --create 'Projector HD 1' --description 'Mobile HD projector'
+		--email 'hdproj1@yourdomain'
+
+	meqaris --create 'Teleconference set X-2'
+		--description 'Teleconference set: TV + speaker + microphone'
+		--email 'telco_set_x2@yourdomain'</pre>
+
+<p>
+The name (after the <code>--create</code> parameter) is required. The description is
+optional and is just for users. The e-mail address is also required,
+otherwise the resource wouldn't "know" that the invitation is meant for it.
+</p>
+<p>
+If you plan to have real operating system-level users for your resources, you
+can still bind them to Meqaris using the <code>.forward</code> file for Postfix, or
+the <code>.procmailrc</code> file for Procmail that should work for all incoming mail,
+to pass the mail to the Meqaris system.
+</p>
+<p>
+Once resources are added, you can start booking them - just send your
+invitations with the resources' configured e-mail addresses just like you
+would send invitations to other meeting participants.
+See the <a href="usage-mua.html" hreflang="en">User's manual</a> on how to do that.
+</p>
+<p>
+Warning: you can put more than one Meqaris resource in the same invitation,
+but you may receive multiple replies in that case (even declining). The resources get properly
+booked, though.
+</p>
+<p>
+To later modify the resource, if needed, use the <code>--update</code> parameter, passing
+the name of the resource to modify and the new values:
+</p>
+<pre>
+	meqaris --update 'Teleconference set X-2'
+		--name 'Teleconference set X-3'
+		--description 'Teleconference set: HDTV + 2 speakers + mic'
+		--email 'telco_set_x3@yourdomain'</pre>
+
+<p>
+To temporarily disable a resource from being booked, run
+</p>
+
+	<pre>	meqaris --disable 'Room 100'</pre>
+
+<p>
+To re-enable a temporarily-disabled resource to be allowed to be booked
+again, run
+</p>
+
+	<pre>	meqaris --enable 'Room 100'</pre>
+
+<p>
+To permanently delete a resource, run
+</p>
+
+	<pre>	meqaris --delete 'Room 100'</pre>
+
+<p>
+After this, you need to re-create the resource in order to use it again.
+Resources which have meetings booked (even past) cannot be deleted right now.
+</p>
+<p>
+To modify a setting in the Meqaris database, run
+</p>
+
+	<pre>	meqaris --set &lt;name&gt; --value &lt;new_value&gt;</pre>
+
+<p>
+e.g.
+</p>
+
+	<pre>	meqaris --set mail_server --value 127.0.0.1</pre>
+
+<p>
+To set the value to <code>NULL</code>, run just
+</p>
+
+	<pre>	meqaris --set &lt;name&gt;</pre>
+
+<p>
+To completely delete the Meqaris data and database structures in the
+database, run
+</p>
+
+	<pre>	meqaris --destroy-db</pre>
+
+<p>
+The database structures will be re-created by Meqaris upon receiving the
+first invitation or the first command that modifies the database (except
+<code>--destroy-db</code>), which includes running
+</p>
+
+	<pre>	meqaris --upgrade-db</pre>
+
+<p>
+Finally,
+</p>
+<pre>
+	meqaris --license
+	meqaris --licence</pre>
+
+<p>
+displays Meqaris license information, and
+</p>
+
+	<pre>	meqaris --version</pre>
+
+<p>
+displays Meqaris version information.
+
+<p>
+You can use the provided <code>scripts/mkdump.sh</code> script to make a database backup
+which can later be restored using the <code>scripts/restoredb.sh</code> script.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">The configuration file</h2>
+
+<p>
+Meqaris uses an INI file to hold the primary configuration. The file's
+default syntax is
+</p>
+<pre>
+	[meqaris]
+	dbtype=postgresql
+	datadir=/var/lib/meqaris
+	log4perl_config_location=/var/lib/meqaris/meqaris-log4perl.cfg
+
+	[postgresql]
+	username=meqaris
+	password=meqaris-pass
+	dbname=meqaris
+	host=127.0.0.1
+	port=5432</pre>
+
+<p>
+The <code>dbtype</code> parameter in the <code>[meqaris]</code> section holds the type of the
+database and the name of the database settings' section.
+</p>
+<p>
+The <code>datadir</code> parameter in the <code>[meqaris]</code> section tells where the Meqaris'
+data files (SQL files) are.
+</p>
+<p>
+The <code>log4perl_config_location</code> parameter in the <code>[meqaris]</code> section gives the
+location of the configuration file for Log::Log4perl.
+</p>
+<p>
+The <code>username</code> parameter in the <code>[postgresql]</code> section gives the database
+username for the database.
+</p>
+<p>
+The <code>password</code> parameter in the <code>[postgresql]</code> section gives the database
+password for the provided username for the database.
+</p>
+<p>
+The <code>dbname</code> parameter in the <code>[postgresql]</code> section gives the name of the
+database to connect to.
+</p>
+<p>
+The <code>host</code> parameter in the <code>[postgresql]</code> section gives the hostname or an
+IP address of the database to connect to.
+</p>
+<p>
+The <code>port</code> parameter in the <code>[postgresql]</code> section gives the port number of
+the database to connect to.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">Configuration in the database</h2>
+
+<p>
+Meqaris uses also a database table to hold some of its configuration.
+</p>
+<p>
+To modify a setting in the Meqaris database, run
+</p>
+
+	<pre>	meqaris --set &lt;name&gt; --value &lt;new_value&gt;</pre>
+
+<p>
+e.g.
+</p>
+
+	<pre>	meqaris --set mail_server --value 127.0.0.1</pre>
+
+<p>
+To set the value to <code>NULL</code>, run just
+</p>
+
+	<pre>	meqaris --set &lt;name&gt;</pre>
+
+<p>
+Currently, the following user-modifiable parameters are supported:
+</p>
+<ul>
+ <li><code>mail_server</code>: The address of the mail server to use (the default
+  value is <code>NULL</code> meaning to use the default mail server guessing by the
+  Mail::Internet Perl module).<br>
+  The setting is used only when
+  <code>mail_sending_method</code> is <em class="important">NOT</em> set to <code>mail_command</code>.
+  <br><br></li>
+
+ <li><code>mail_server_port:</code> The port on the mail server to use (the default
+  value is <code>NULL</code> meaning to use the default mail server port by the
+  Mail::Internet Perl module).<br>
+  The setting is used only when
+  <code>mail_sending_method</code> is <em class="important">NOT</em> set to <code>mail_command</code>.
+  <br><br></li>
+
+ <li><code>mail_sending_method</code>: The method to use to send mail. The default
+  value is <code>NULL</code> meaning to use the default method used by the
+  Mail::Internet Perl module. Other possible values: the word <code>default</code>,
+  <code>Mail::Internet</code> and <code>mail_command</code>.
+  <br><br></li>
+
+ <li><code>mail_command</code>: The command to pipe the outgoing mail replies into
+  instead of sending the replies using a mail server. The default value is
+  <code>NULL</code>.<br> To gather replies in a file (on Linux), use something like
+
+  	<pre>	cat >> /path/to/your_file</pre>
+
+  and make sure that the file is writeable (and all the directories on the path
+  are traversable) by the mail server's user.<br>
+  To send replies to standard output, use just
+
+  	<pre>	cat</pre>
+
+  The setting is used only when <code>mail_sending_method = "mail_command"</code>.
+  <br><br></li>
+
+ <li><code>parser_tmp_dir</code>: The path to a temporary directory for files with
+  message parts. Default = <code>/tmp</code>. <code>NULL</code> means use the default.
+  <br><br></li>
+
+</ul>
+
+</body></html>

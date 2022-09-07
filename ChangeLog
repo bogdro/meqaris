@@ -1,3 +1,49 @@
+2022-05-16	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 1.0:
+	  Recurring events are now supported (can be booked and cancelled).
+	  Invitations to many resources at the same time are now supported
+	  using a temporary solution (they may give multiple responses,
+	  though). Settings can now be modified using the new command line
+	  options: --set and --value. Other small changes. Added an HTML
+	  manual. Other documentation updates.
+	* bin/meqaris: Support for recurring events using DateTime::Set.
+	  Temporary solution for multiple resources in one invitation. Added
+	  logging an input parsing error. Disconnect from the database when
+	  finishing. Improvements in log messages. Added the SourceForge link
+	  to the response iCalendar, mail headers, mail body, and the help
+	  and license messages.
+	* bin/meqaris (prop_array): A new subroutine to get a property array
+	  from an event entry.
+	* bin/meqaris (print_help): Added the new command line options.
+	* sql/meqaris-v6.pgsql: New database file.
+	* sql/meqaris-full.pgsql: Replaced the unique index on the
+	  meqaris.meq_resource_reservations.rr_uid column with a not-null
+	  constraint and added a non-unique index for the column to support
+	  recurring events.
+	* sql/meqaris-*.pgsql: Added the SourceForge link.
+	* Makefile: Added installing documentation, requiring a new parameter.
+	  Added testing for BSD tar and choosing the GNU tar format then.
+	  Added the RPM spec file to the package. Making DATADIR writeable to
+	  be able to use lock files. Added the SourceForge link.
+	* meqaris.spec: Added an RPM specification file for building packages.
+	* manual: A new manual in HTML format for Meqaris users and
+	  administrators, replacing the text file.
+	* Meqaris-user-manual.txt: Added information about modifying settings
+	  in the database using the new command line options. Added a warning
+	  that inviting more than one Meqaris resource per e-mail is supported
+	  but may give multiple responses. Added a note at the top saying that
+	  the manual is replaced by the HTML version. Added the SourceForge
+	  link.
+	* INSTALL-Meqaris.txt: Added editing the main and log configuration
+	  files. Added installing and uninstalling the Log4perl configuration.
+	  Added installing the documentation. Added permission information.
+	  Added the SourceForge link.
+	* README: Removed the PL/pgSQL language requirement, because PL/pgSQL
+	  is installed by default on PostgreSQL 9.0+ and Meqaris requires
+	  version 9.2+ anyway. Moved DateTime::Set to the list of required
+	  modules. Added the SourceForge link.
+
 2022-05-08	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 0.9:
@@ -83,7 +129,7 @@
 	  setting from the database.
 	* config/meqaris-log4perl.cfg: Added a simple Log4perl configuration.
 	* sql/meqaris-v2.pgsql: New database file.
-	* sql/meqaris-full.pgsql: added new configuration settings.
+	* sql/meqaris-full.pgsql: Added new configuration settings.
 	* Makefile: Added installing the meqaris-log4perl.cfg file.
 	* README: Mentioned Log::Log4perl as an optional module.
 	* INSTALL-Meqaris.txt: Added that Perl and the required modules must
