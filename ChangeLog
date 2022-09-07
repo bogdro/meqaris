@@ -1,3 +1,23 @@
+2022-05-06	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 0.5:
+	  Events can now be updated. Mail responses can now be piped into a
+	  command instead of being sent to a mail server. Other small changes.
+	  Documentation updates.
+	* bin/meqaris: Allow events to be updated: simply check if the UID
+	  is already present in the database - if yes, delete the old and
+	  insert the new event. The script now explicitly exits with an exit
+	  code of 0 when processing is done. Mail responses can now be piped
+	  into a command instead of being sent to a mail server.
+	* bin/meqaris (val): New subroutine to get iCalendar's values in a
+	  safe way.
+	* sql/meqaris-v3.pgsql: New database file.
+	* sql/meqaris-full.pgsql: Added new configuration settings.
+	* INSTALL-Meqaris.txt: Added a note about filesystem permissions.
+	* Meqaris-user-manual.txt: Added information about the possibility
+	  to use the ".forward" and ".procmailrc" files. Added information
+	  about the new configuration settings.
+
 2022-05-05	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 0.3:

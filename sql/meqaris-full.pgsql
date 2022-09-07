@@ -113,4 +113,10 @@ insert into meqaris.meq_config (c_name, c_value, c_description)
 values ('mail_server_port', null, 'The port on the mail server to use (NULL = default)');
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('db_version', '2', 'The current version of the Meqaris database');
+values ('mail_sending_method', null, 'The method to send mail replies NULL=default, Mail::Internet, mail_command');
+
+insert into meqaris.meq_config (c_name, c_value, c_description)
+values ('mail_command', null, 'The command to pipe mail replies to when mail_sending_method="mail_command" (NULL = none)');
+
+insert into meqaris.meq_config (c_name, c_value, c_description)
+values ('db_version', '3', 'The current version of the Meqaris database');

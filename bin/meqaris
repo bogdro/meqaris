@@ -32,8 +32,8 @@ use Getopt::Long;
 use MIME::Base64 qw(encode_base64);
 use MIME::Parser;
 
-my $meqaris_version = '0.3';
-my $meqaris_dbversion = 2;
+my $meqaris_version = '0.5';
+my $meqaris_dbversion = 3;
 
 # ============================ Loggers: ===================================
 
@@ -479,11 +479,11 @@ for my $p (@parts) {
 
 		# Check the method property. ARRAY! List context required!
 		my ($method) = @{$ical->property('METHOD')};
-		if ( (! defined ($method)) or ($method->value ne 'REQUEST' and $method->value ne 'CANCEL') ) {
+		if ( val($method) ne 'REQUEST' and val($method) ne 'CANCEL' ) {
 
 			log_info "Message from '$sender' with subject '$subject'" .
 				" contains an iCalendar, but its method '" .
-				(defined ($method)? $method->value : '?') . "' is unsupported. Skipping";
+				val($method) . "' is unsupported. Skipping";
 			next;
 		}
 
@@ -511,30 +511,30 @@ for my $p (@parts) {
 
 			my ($organizer) = @{$event->property('organizer')};
 			my $organizer_mail = undef;
-			($organizer_mail = $organizer->value) =~ s/^mailto://io if defined ($organizer);
+			($organizer_mail = val($organizer)) =~ s/^mailto://io;
 			my ($uid) = @{$event->property('uid')};
 
-			log_info "Got event with uid='" . (defined ($uid)? $uid->value : '?') .
-				"' and organizer='" . (defined ($organizer)? $organizer->value : '?') . "'";
-			if ( $method->value eq 'REQUEST' ) {
+			log_info "Got event with uid='" . val ($uid) .
+				"' and organizer='" . val ($organizer) . "'";
+			if ( val ($method) eq 'REQUEST' ) {
 
-				log_trace "Event '" . $uid->value . "': REQUEST";
+				log_trace "Event '" . val($uid) . "': REQUEST";
 
 				# Get the event properties. ARRAY! List context required!
 				my ($dtstart) = @{$event->property('dtstart')};
 				my ($dtend) = @{$event->property('dtend')};
-				my ($dtstamp) = $event->property('dtstamp')?
+				my ($dtstamp) = defined ($event->property('dtstamp'))?
 					@{$event->property('dtstamp')} : undef;
-				my ($sequence) = $event->property('sequence')?
+				my ($sequence) = defined ($event->property('sequence'))?
 					@{$event->property('sequence')} : undef;
 				my ($summary) = @{$event->property('summary')};
 
-				log_info "Event REQUEST uid='" . (defined ($uid)? $uid->value : '?') .
-					"': dtstart='" . (defined ($dtstart)? $dtstart->value : '?') .
-					"', dtend='" . (defined ($dtend)? $dtend->value : '?') .
-					"', dtstamp='" . (defined ($dtstamp)? $dtstamp->value : '?') .
-					"', sequence='" . (defined ($sequence)? $sequence->value : '?') .
-					"', summary='" . (defined ($summary)? $summary->value : '?') . "'";
+				log_info "Event REQUEST uid='" . val ($uid) .
+					"': dtstart='" . val ($dtstart) .
+					"', dtend='" . val ($dtend) .
+					"', dtstamp='" . val ($dtstamp).
+					"', sequence='" . val ($sequence) .
+					"', summary='" . val ($summary) . "'";
 
 				# Get the timezone ID from the parameters:
 				my $tzid_start = $dtstart->parameters->{'TZID'};
@@ -559,24 +559,98 @@ for my $p (@parts) {
 				for my $attendee (@{$event->property('attendee')}) {
 
 					# Get the raw e-mail address:
-					($reply_sender = $attendee->value) =~ s/^mailto://io;
-					log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+					($reply_sender = val($attendee)) =~ s/^mailto://io;
+					my $updating = 0;
+					log_debug "Event '" . val ($uid) .
 						"': trying attendee '$reply_sender'";
 					# Skip if not one of our resources:
 					if ( ! defined ($res->{$reply_sender}) ) {
 					
-						log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+						log_debug "Event '" . val ($uid) .
 							"': attendee '$reply_sender' doesn't match";
 						next;
 					}
-					log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+					log_debug "Event '" . val ($uid) .
 						"': attendee '$reply_sender' found";
-					# decline if resource is disabled:
+					# check if resource is enabled:
 					if ( $res->{$reply_sender}->{'r_enabled'} ) {
 
-						log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+						log_debug "Event '" . val ($uid) .
+							"': attendee '$reply_sender' is enabled - proceeding";
+						# Attendee found and enabled. Check if this is an update.
+						my @values = (val ($uid));
+						my @old_event = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref doesn't seem to work
+							db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
+							{ Slice => {} }, @values) };
+						if (defined ($old_event[0]{'rr_id'}) ) {
+
+							log_info "Event '" . val ($uid) .
+								"': is an update";
+							# check if the sender is the organizer and decline if not
+							my $sender_mail;
+							if ( $sender =~ /<([^>]+)>/o ) {
+								$sender_mail = $1;
+							} else {
+								$sender_mail = $sender;
+							}
+							if ( $sender_mail ne $organizer_mail ) {
+
+								log_info "Event '" . val ($uid) .
+									"': sender '$sender_mail' is not iCalendar's organizer '$organizer_mail' - declining";
+								$response_type = 'Declined';
+								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+								$calendar_reply->add_entry($event);
+								last EV;
+							}
+							log_debug "Event '" . val ($uid) .
+								"': sender '$sender_mail' is iCalendar's organizer '$organizer_mail'";
+							$old_event[0]{'rr_organiser'} =~ s/^mailto://io;
+							if ( $sender_mail ne $old_event[0]{'rr_organiser'} ) {
+
+								log_info "Event '" . val ($uid) .
+									"': sender '$sender_mail' is not the same organizer as in the database '" .
+									$old_event[0]{'rr_organiser'} . "' - declining";
+								$response_type = 'Declined';
+								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+								$calendar_reply->add_entry($event);
+								last EV;
+							}
+							# start transaction for the DELETE + INSERT
+							$dbh->begin_work();
+							$updating = 1;
+							my $stmth = db_stmt ($dbh,
+								'delete from meqaris.meq_resource_reservations ' .
+								'where rr_id = $1');
+							if ( $stmth ) {
+								@values = ($old_event[0]{'rr_id'});
+								$stmth->execute(@values);
+								if ( $dbh->errstr ) {
+									log_error "Event '" . val ($uid) .
+										"': error deleting old event: " .
+										$dbh->errstr;
+									$response_type = 'Declined';
+									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+									$calendar_reply->add_entry($event);
+									$dbh->rollback;
+									last EV;
+								} else {
+									log_info "Event '" . val ($uid) .
+										"': old event deleted successfully";
+								}
+							} else {
+								log_error "Event '" . val ($uid) .
+									"': error deleting old event: " .
+									$dbh->errstr;
+								$response_type = 'Declined';
+								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+								$calendar_reply->add_entry($event);
+								$dbh->rollback;
+								last EV;
+							}
+						}
+						# Try to insert the new event:
+						log_info "Event '" . val ($uid) .
 							"': inserting new event";
-						# Attendee found and enabled - try to insert the event:
 						my $stmth = db_stmt ($dbh,
 							'insert into meqaris.meq_resource_reservations ' .
 							'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
@@ -587,51 +661,55 @@ for my $p (@parts) {
 								$res->{$reply_sender}->{'r_id'},
 								"[$dt_start, $dt_end)",
 								substr ($organizer_mail, 0, 1000),
-								substr ($summary->value, 0, 1000),
-								(defined ($dtstamp))? $dtstamp->value : undef,
-								substr ((defined ($uid)? $uid->value : ''), 0, 1000),
+								substr (val ($summary), 0, 1000),
+								val ($dtstamp),
+								substr (val ($uid), 0, 1000),
 								(defined ($sequence))? $sequence->value : 0,
 								encode_base64 ($orig_invitation)
 								);
 							$stmth->execute(@values);
 							if ( $dbh->errstr ) {
 
-								log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+								log_error "Event '" . val ($uid) .
 									"': error inserting new event: " .
 									$dbh->errstr . " - declining";
 								# DB error - decline
 								$response_type = 'Declined';
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+								$dbh->rollback if $updating;
 							} else {
-								log_info "Event '" . (defined ($uid)? $uid->value : '?') .
-									"': event inserted";
+								log_info "Event '" . val ($uid) .
+									"': event inserted for attendee '$reply_sender'";
 								$response_type = 'Accepted';
 								$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+								$dbh->commit if $updating;
 							}
 						}
 						else {
-							log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+							log_error "Event '" . val ($uid) .
 								"': error inserting new event: " .
 								$dbh->errstr . " - declining";
 							# DB error - decline
 							$response_type = 'Declined';
 							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+							$dbh->rollback if $updating;
 						}
 					}
 					else {
-						log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+						log_info "Event '" . val ($uid) .
 							"': resource disabled - declining";
 						# Attendee disabled - decline
 						$response_type = 'Declined';
 						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+						$dbh->rollback if $updating;
 					}
 					$calendar_reply->add_entry($event);
 					last EV;
 				} # for my $attendee
-			} # $method->value eq 'REQUEST'
-			elsif ( $method->value eq 'CANCEL' ) {
+			} # 'REQUEST'
+			elsif ( val ($method) eq 'CANCEL' ) {
 
-				log_info "Event '" . (defined ($uid)? $uid->value : '?') . "': CANCEL";
+				log_info "Event '" . val ($uid) . "': CANCEL";
 
 				# Cancellation request - check if the event
 				# exists, check if sender is the organiser
@@ -651,30 +729,30 @@ for my $p (@parts) {
 				}
 				if ( $sender_mail ne $organizer_mail ) {
 
-					log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+					log_info "Event '" . val ($uid) .
 						"': sender '$sender_mail' is not iCalendar's organizer '$organizer_mail' - ignoring";
 					next;
 				}
-				log_debug "Event '" . (defined ($uid)? $uid->value : '?') .
+				log_debug "Event '" . val ($uid) .
 					"': sender '$sender_mail' is iCalendar's organizer '$organizer_mail'";
-				my @values = ($uid->value);
-				log_trace "Event '" . (defined ($uid)? $uid->value : '?') .
+				my @values = (val ($uid));
+				log_trace "Event '" . val ($uid) .
 						"': searching the database";
 				my @event = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref doesn't seem to work
 					db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
 					{ Slice => {} }, @values) };
 				if (! defined ($event[0]{'rr_id'}) ) {
 
-					log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+					log_info "Event '" . val ($uid) .
 						"': not found in database - ignoring: " . $dbh->errstr;
 					next;
 				}
-				log_trace "Event '" . (defined ($uid)? $uid->value : '?') .
+				log_trace "Event '" . val ($uid) .
 						"': found in the database";
 				$event[0]{'rr_organiser'} =~ s/^mailto://io;
 				if ( $sender_mail ne $event[0]{'rr_organiser'} ) {
 
-					log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+					log_info "Event '" . val ($uid) .
 						"': sender '$sender_mail' is not the same organizer as in the database '" .
 						$event[0]{'rr_organiser'} . "' - ignoring";
 					next;
@@ -686,20 +764,20 @@ for my $p (@parts) {
 					@values = ($event[0]{'rr_id'});
 					$stmth->execute(@values);
 					if ( $dbh->errstr ) {
-						log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+						log_error "Event '" . val ($uid) .
 							"': error deleting event: " .
 							$dbh->errstr;
 					} else {
-						log_info "Event '" . (defined ($uid)? $uid->value : '?') .
+						log_info "Event '" . val ($uid) .
 							"': event deleted successfully";
 					}
 				} else {
-					log_error "Event '" . (defined ($uid)? $uid->value : '?') .
+					log_error "Event '" . val ($uid) .
 						"': error deleting event: " .
 						$dbh->errstr;
 				}
 
-			} # $method->value eq 'CANCEL'
+			} # 'CANCEL'
 		}
 		if ( $response_type ne '' ) {
 
@@ -726,20 +804,46 @@ for my $p (@parts) {
 				Encoding => 'base64'
 			);
 			log_debug "Response mail:\n=====\n" . $mail->stringify . "\n=====";
-			my %send_cfg = (
-				MailFrom => $reply_sender,
-				To => $sender);
-			my $mail_server = db_get_config ($dbh, 'mail_server');
-			my $mail_server_port = db_get_config ($dbh, 'mail_server_port');
-			$send_cfg{Host} = $mail_server if defined ($mail_server) && $mail_server ne '';
-			$send_cfg{Port} = $mail_server_port if defined ($mail_server_port) && $mail_server_port ne '';
-			$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
+			my $mail_sending_method = db_get_config ($dbh, 'mail_sending_method');
+			if ( defined ($mail_sending_method) && $mail_sending_method eq 'mail_command' ) {
 
-			log_trace "Sending response to '$sender' using " .
-				"mail_server:port='" .
-				(defined ($mail_server)? $mail_server : '(default)') .
-				':' . (defined ($mail_server_port)? $mail_server_port : '(default port)') ."'";
-			$mail->smtpsend(%send_cfg);
+				# send by piping the mail to a command
+				my $mail_command = db_get_config ($dbh, 'mail_command');
+				if ( defined ($mail_command) && $mail_command ne '' ) {
+
+					# remove any pipe symbols first:
+					$mail_command =~ s/^\s*\|\s*//o;
+					log_info "Sending response to '$sender' using command '$mail_command'";
+					open (my $cmd, '|-', $mail_command);
+					if ( ! $cmd ) {
+						log_warn "Mail_sending_method = mail_command, but mail_command failed to run: $!." .
+							' Cannot send the response.';
+					}
+					print $cmd $mail->stringify;
+					close $cmd;
+				}
+				else {
+					log_warn 'Mail_sending_method = mail_command, but mail_command was not defined.' .
+						' Cannot send the response.';
+				}
+			}
+			else {
+				# send by mail (the default)
+				my %send_cfg = (
+					MailFrom => $reply_sender,
+					To => $sender);
+				my $mail_server = db_get_config ($dbh, 'mail_server');
+				my $mail_server_port = db_get_config ($dbh, 'mail_server_port');
+				$send_cfg{Host} = $mail_server if defined ($mail_server) && $mail_server ne '';
+				$send_cfg{Port} = $mail_server_port if defined ($mail_server_port) && $mail_server_port ne '';
+				$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
+
+				log_info "Sending response to '$sender' using " .
+					"mail_server:port='" .
+					(defined ($mail_server)? $mail_server : '(default)') .
+					':' . (defined ($mail_server_port)? $mail_server_port : '(default port)') ."'";
+				$mail->smtpsend(%send_cfg);
+			}
 			$processed = 1;
 		}
 	}	# $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics'
@@ -751,6 +855,8 @@ for my $p (@parts) {
 }
 
 $parser->filer->purge;
+
+exit 0;
 
 # ============================ Subroutines: ===================================
 
@@ -781,6 +887,14 @@ sub print_help {
 			"--upgrade-db\t\t\tRun the necessary Meqaris database structure upgrade scripts\n" .
 			"--version\t\t\tDisplay Meqaris version information\n"
 		;
+}
+
+# ============================ val ===================================
+
+sub val {
+
+	my $prop = shift;
+	return (defined ($prop)? $prop->value : '(undef)');
 }
 
 # ============================ db_connect ===================================

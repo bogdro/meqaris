@@ -34,10 +34,12 @@ Requirements:
   The Log::Log4perl module is optional, but can be of great heal with logging
   when problems occur.
 
-- actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
+  Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
 
 - a PostgreSQL database server (https://www.postgresql.org/), version 9.2
-  or newer, with the PL/pgSQL language installed.
+  or newer, with the PL/pgSQL language installed and the btree_gist
+  extension binary file (you may need to install the 'contrib' package, or
+  similar).
 
 Author: Bogdan Drozdowski, bogdro (at) users . sourceforge . net
 

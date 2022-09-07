@@ -117,7 +117,7 @@ Meqaris configuration
 
 You need to edit the meqaris.ini file to set the proper values for database
  access in the [postgresql] section and your chosen application data files'
- directory in the [meqaris] section under the 'datadir' key:
+ directory in the [meqaris] section under:
 
 [meqaris]
 dbtype=postgresql
@@ -130,6 +130,11 @@ password=meqaris-pass
 dbname=meqaris
 host=127.0.0.1
 port=5432
+
+Make sure that the "datadir" directory, the "log4perl_config_location" file
+ and the actual log file have the right permission so that Meqaris, which
+ will run under the mail server's privileges, has the right access to all of
+ those locations.
 
 -------------------------
 Mail server configuration

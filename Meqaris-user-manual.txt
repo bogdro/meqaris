@@ -56,6 +56,11 @@ The name (after the --create parameter) is required. The description is
  optional and is just for users. The e-mail address is also required,
  otherwise the resource wouldn't "know" that the invitation is meant for it.
 
+If you plan to have real operating system-level users for your resources, you
+ can still bind them to Meqaris using the ".forward" file for Postfix, or
+ the ".procmailrc" file that should work for all incoming mail, to pass the
+ mail to the Meqaris system.
+
 Once resources are added, you can start booking them - just send your
  invitations with the resources' configured e-mail addresses just like you
  would send invitations to other meeting participants.
@@ -167,12 +172,28 @@ The table has 3 columns:
 - parameter's description - c_description
 
 Currently, the following user-modifiable parameters are supported:
+
 - c_name = mail_server: The address of the mail server to use (the default
   value is NULL meaning to use the default mail server guessing by the
-  Mail::Internet Perl module).
-- c_name = mail_server_port The port on the mail server to use (the default
+  Mail::Internet Perl module). The setting is used only when
+  mail_sending_method is NOT set to "mail_command".
+
+- c_name = mail_server_port: The port on the mail server to use (the default
   value is NULL meaning to use the default mail server port by the
-  Mail::Internet Perl module).
+  Mail::Internet Perl module). The setting is used only when
+  mail_sending_method is NOT set to "mail_command".
+
+- c_name = mail_sending_method: The method to use to send mail. The default
+  value is NULL meaning to use the default method used by the
+  Mail::Internet Perl module. Other possible values: the word "default",
+  "Mail::Internet" and "mail_command".
+
+- c_name = mail_command: The command to pipe the outgoing mail replies into
+  instead of sending the replies using a mail server. The default value is
+  NULL. To gather replies in a file, use something like
+  	cat >> /path/to/your_file
+  and make sure that the file is writeable by the mail server's user.
+  The setting is used only when mail_sending_method = "mail_command".
 
 -----------------------------------------------------------------------
 
