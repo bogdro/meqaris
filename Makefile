@@ -22,7 +22,7 @@
 #
 
 NAME = meqaris
-VER = 1.2
+VER = 1.4
 
 RMDIR = /bin/rm -fr
 # when using '-p', no error is generated when the directory exists
@@ -40,38 +40,64 @@ PACK1_EXT = .tar
 PACK2 = /usr/bin/gzip -9
 PACK2_EXT = .gz
 
+POD2MAN = pod2man
+
 SUBDIRS = bin config manual scripts sql
+
+EXTRA_DIST = AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt NEWS \
+	Makefile $(NAME).pod $(NAME).spec README
+
+ifeq ($(BINDIR),)
+BINDIR = /usr/bin
+endif
+
+ifeq ($(CONFDIR),)
+CONFDIR = /etc
+endif
+
+ifeq ($(DOCDIR),)
+DOCDIR = /usr/share/doc
+endif
+
+ifeq ($(DATADIR),)
+DATADIR = /var/lib
+endif
+
+ifeq ($(MANDIR),)
+MANDIR = /usr/share/man
+endif
 
 all:	dist
 
 dist:	$(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT)
 
-$(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT): AUTHORS ChangeLog COPYING NEWS \
-		README INSTALL-Meqaris.txt Makefile meqaris.spec \
-		meqaris.spec $(shell find $(SUBDIRS) -type f)
+$(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT): $(EXTRA_DIST) \
+		$(shell find $(SUBDIRS) -type f)
 	$(RMDIR) $(NAME)-$(VER)
 	$(MKDIR) $(NAME)-$(VER)
-	$(COPY) AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt NEWS \
-		README Makefile meqaris.spec \
-		$(SUBDIRS) $(NAME)-$(VER)
+	$(COPY) $(EXTRA_DIST) $(SUBDIRS) $(NAME)-$(VER)
 	$(PACK1) $(NAME)-$(VER)$(PACK1_EXT) $(NAME)-$(VER)
 	$(PACK2) $(NAME)-$(VER)$(PACK1_EXT)
 	$(RMDIR) $(NAME)-$(VER)
 
 install:
 	$(MKDIR) $(BINDIR)
-	$(MKDIR) $(CONFDIR)
+	$(MKDIR) $(CONFDIR)/logrotate.d
 	$(MKDIR) $(DOCDIR)/$(NAME)
 	$(MKDIR) $(DATADIR)/$(NAME)/sql
-	$(CHMOD) 755 $(BINDIR) $(CONFDIR) $(DATADIR)/$(NAME) $(DATADIR)/$(NAME)/sql
-	$(COPY) bin/meqaris $(BINDIR)
-	$(CHMOD) 755 $(BINDIR)/meqaris
+	$(MKDIR) $(MANDIR)/man1
+	$(CHMOD) 755 $(BINDIR) $(CONFDIR) $(CONFDIR)/logrotate.d \
+		$(DATADIR)/$(NAME) $(DATADIR)/$(NAME)/sql
+	$(COPY) bin/$(NAME) $(BINDIR)
+	$(CHMOD) 755 $(BINDIR)/$(NAME)
 	$(COPY) sql/*.pgsql $(DATADIR)/$(NAME)/sql
 	$(CHMOD) 644 $(DATADIR)/$(NAME)/sql/*.pgsql
-	$(COPY) config/meqaris-log4perl.cfg $(DATADIR)/$(NAME)/
-	$(CHMOD) 644 $(DATADIR)/$(NAME)/meqaris-log4perl.cfg
+	$(COPY) config/$(NAME)-log4perl.cfg $(DATADIR)/$(NAME)/
+	$(CHMOD) 644 $(DATADIR)/$(NAME)/$(NAME)-log4perl.cfg
 	$(COPY) manual AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt \
 		README $(DOCDIR)/$(NAME)/
+	$(POD2MAN) $(NAME).pod $(MANDIR)/man1/$(NAME).1
+	#$(PACK2) $(MANDIR)/man1/$(NAME).1
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/en/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/en/rsrc/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/rsrc/*.*
@@ -81,7 +107,17 @@ install:
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/en/rsrc
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/rsrc
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/rsrc/css
-	$(COPY) config/meqaris.ini $(CONFDIR)/
-	$(CHMOD) 644 $(CONFDIR)/meqaris.ini
+	$(COPY) config/$(NAME).ini $(CONFDIR)/
+	$(CHMOD) 644 $(CONFDIR)/$(NAME).ini
+	$(COPY) config/$(NAME).logrotate $(CONFDIR)/logrotate.d/$(NAME)
+	$(CHMOD) 644 $(CONFDIR)/logrotate.d/$(NAME)
 
-.PHONY: all dist install
+uninstall:
+	$(RMDIR) $(BINDIR)/$(NAME)
+	$(RMDIR) $(CONFDIR)/$(NAME).ini
+	$(RMDIR) $(CONFDIR)/logrotate.d/$(NAME)
+	$(RMDIR) $(DOCDIR)/$(NAME)
+	$(RMDIR) $(DATADIR)/$(NAME)
+	$(RMDIR) $(MANDIR)/man1/$(NAME).1*
+
+.PHONY: all dist install uninstall

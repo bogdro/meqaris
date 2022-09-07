@@ -217,13 +217,15 @@ default syntax is
 	dbtype=postgresql
 	datadir=/var/lib/meqaris
 	log4perl_config_location=/var/lib/meqaris/meqaris-log4perl.cfg
+	lock_dir=/var/lock
 
 	[postgresql]
 	username=meqaris
 	password=meqaris-pass
 	dbname=meqaris
 	host=127.0.0.1
-	port=5432</pre>
+	port=5432
+	connect_timeout=30</pre>
 
 <p>
 The <code>dbtype</code> parameter in the <code>[meqaris]</code> section holds the type of the
@@ -232,6 +234,15 @@ database and the name of the database settings' section.
 <p>
 The <code>datadir</code> parameter in the <code>[meqaris]</code> section tells where the Meqaris'
 data files (SQL files) are.
+</p>
+<p>
+The <code>lock_dir</code> parameter in the <code>[meqaris]</code> section gives the
+location of the directory to put lock files in. Lock files prevent two or more
+Meqaris processes from accessing crucial code at the same time, to avoid e.g.
+running two database upgrades at the same time (one of which is bound to fail).
+<br>
+The directory must be writeable by your mail server's user (and its parent directories
+must be traversable by your mail server's user).
 </p>
 <p>
 The <code>log4perl_config_location</code> parameter in the <code>[meqaris]</code> section gives the
@@ -256,6 +267,10 @@ IP address of the database to connect to.
 <p>
 The <code>port</code> parameter in the <code>[postgresql]</code> section gives the port number of
 the database to connect to.
+</p>
+<p>
+The <code>connect_timeout</code> parameter in the <code>[postgresql]</code> section
+specifies the database connection timeout, in seconds.
 </p>
 
 <!-- ############################################################ -->

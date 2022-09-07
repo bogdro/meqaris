@@ -22,6 +22,7 @@ Requirements:
   * DateTime::TimeZone::ICal,
   * DBD::Pg,
   * DBI,
+  * Fcntl,
   * Getopt::Long,
   * Log::Log4perl,
   * MIME::Base64,

@@ -1,6 +1,6 @@
 # Special names here like {__make} come from /usr/lib/rpm/macros, /usr/lib/rpm/macros.rpmbuild
 
-%define meq_version 1.2
+%define meq_version 1.4
 %define meq_release 1
 %define meq_name meqaris
 %define meq_url https://meqaris.sourceforge.io
@@ -39,8 +39,8 @@ BuildRequires:	make
 
 %post
 %__mkdir_p /var/log/
-touch /var/log/meqaris.log
-%__chmod 666 /var/log/meqaris.log
+touch /var/log/%{meq_name}.log
+%__chmod 666 /var/log/%{meq_name}.log
 
 #postun
 
@@ -50,7 +50,8 @@ touch /var/log/meqaris.log
 	BINDIR=%{buildroot}/%{_bindir} \
 	CONFDIR=%{buildroot}/%{_sysconfdir} \
 	DATADIR=%{buildroot}/var/lib \
-	DOCDIR=%{buildroot}/%{_datadir}/doc
+	DOCDIR=%{buildroot}/%{_datadir}/doc \
+	MANDIR=%{buildroot}/%{_mandir}
 
 %clean
 
@@ -59,19 +60,21 @@ touch /var/log/meqaris.log
 %files
 
 %defattr(-,root,root)
-%{_bindir}/meqaris
-%config(noreplace) %attr(644,-,-) %{_sysconfdir}/meqaris.ini
+%{_bindir}/%{meq_name}
+%config(noreplace) %attr(644,-,-) %{_sysconfdir}/%{meq_name}.ini
+%config(noreplace) %attr(644,-,-) %{_sysconfdir}/logrotate.d/%{meq_name}
 %doc README
 %doc COPYING
 %doc AUTHORS
 %doc ChangeLog
 %doc INSTALL-Meqaris.txt
+%doc %{_mandir}/man1/%{meq_name}.1%_extension
 %doc manual
 # attr(777,-,-)
-%dir /var/lib/meqaris
-%dir /var/lib/meqaris/sql
-%attr(644,-,-) /var/lib/meqaris/sql/*
-%config(noreplace) %attr(644,-,-) /var/lib/meqaris/meqaris-log4perl.cfg
-%ghost /var/log/meqaris.log
+%dir /var/lib/%{meq_name}
+%dir /var/lib/%{meq_name}/sql
+%attr(644,-,-) /var/lib/%{meq_name}/sql/*
+%config(noreplace) %attr(644,-,-) /var/lib/%{meq_name}/%{meq_name}-log4perl.cfg
+%ghost /var/log/%{meq_name}.log
 
 %changelog

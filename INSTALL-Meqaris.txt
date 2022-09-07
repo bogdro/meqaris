@@ -105,6 +105,9 @@ Application installation
 - Copy config/meqaris.ini to a directory expected to contain configuration
   files, like /etc
 
+- Copy config/meqaris.logrotate to a directory expected to contain logrotate
+  configuration files, like /etc/logrotate.d
+
 - Copy the manual to a place suitable for documentation, like /usr/share/doc
 
 Alternatively, if you have the 'make' program and some common Linux
@@ -112,11 +115,12 @@ Alternatively, if you have the 'make' program and some common Linux
  Examples:
 
 	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib \
-		DOCDIR=/usr/share/doc
+		DOCDIR=/usr/share/doc MANDIR=/usr/share/man
 	make install BINDIR=$HOME/tools/meqaris/bin \
 		CONFDIR=$HOME/tools/meqaris/etc \
 		DATADIR=$HOME/tools/meqaris/data \
-		DOCDIR=$HOME/tools/meqaris/doc
+		DOCDIR=$HOME/tools/meqaris/doc \
+		MANDIR=$HOME/tools/meqaris/man
 
 All the above directories and their parent directories must be reachable by
  your mail server.
@@ -139,6 +143,7 @@ You need to edit the meqaris.ini file to set the proper values for database
 dbtype=postgresql
 datadir=/path/to/meqaris/data
 log4perl_config_location=/path/to/meqaris/data/meqaris-log4perl.cfg
+lock_dir=/var/lock
 
 [postgresql]
 username=meqaris
@@ -146,6 +151,7 @@ password=meqaris-pass
 dbname=meqaris
 host=127.0.0.1
 port=5432
+connect_timeout=30
 
 Make sure that the "datadir" directory, the "log4perl_config_location" file
  and the actual log file have the right permission so that Meqaris, which
@@ -199,9 +205,14 @@ To uninstall, if needed:
 
 - remove the meqaris.ini file from the directory you installed it to
 
+- remove the meqaris logrotate configuration file from the directory you
+  installed it to
+
 - remove the meqaris-log4perl.cfg file from the directory you installed it to
 
 - remove the application SQL file(s) from the directory you installed them to
+
+- remove the documentation file(s) from the directories you installed them to
 
 - delete the application's database - run as 'postgres':
 
@@ -210,6 +221,19 @@ To uninstall, if needed:
 - delete the application's database user - run as 'postgres':
 
 	dropuser meqaris
+
+Alternatively, if you have the 'make' program and some common Linux
+ utilities, you can run 'make uninstall', passing the the same directories
+ that were used during installation.
+ Examples:
+
+	make uninstall BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib \
+		DOCDIR=/usr/share/doc MANDIR=/usr/share/man
+	make uninstall BINDIR=$HOME/tools/meqaris/bin \
+		CONFDIR=$HOME/tools/meqaris/etc \
+		DATADIR=$HOME/tools/meqaris/data \
+		DOCDIR=$HOME/tools/meqaris/doc \
+		MANDIR=$HOME/tools/meqaris/man
 
 -----------------------------------------------------------------
 

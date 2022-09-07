@@ -1,0 +1,166 @@
+=pod
+
+=head1 NAME
+
+Meqaris - Meeting Equipment and Room Invitation System
+
+=head1 SYNOPSIS
+
+B<meqaris> [options]
+
+some-kind-of-mail-input | B<meqaris> [--conf I<file>]
+
+=head1 DESCRIPTION
+
+Meqaris is a system that
+allows booking meeting rooms and other resources (like mobile whiteboards,
+projectors or conference sets) using the same e-mail invitations that
+are used to invite participants to meetings.
+
+=head1 OPTIONS
+
+Meqaris supports the following command-line options:
+
+=over 4
+
+=item B<--conf> I<file>
+
+Use the given configuration file.
+
+=item B<--create> I<name>
+
+Create a new meeting resource.
+
+=item B<--delete> I<name>
+
+elete a meeting resource with the given name.
+
+=item B<--description> I<desc>
+
+Specifies a description for a meeting resource when creating or updating.
+
+=item B<--destroy-db>
+
+Destroys the Meqaris schema on the database.
+
+=item B<--disable> I<name>
+
+Disables the meeting resource with the given name.
+
+=item B<--email> I<e-mail_address>
+
+Specifies an e-mail address for the meeting resource when creating or updating.
+
+=item B<--enable> I<name>
+
+Enables the meeting resource with the given name
+
+=item B<-h|--help|-?>
+
+Shows the help message.
+
+=item B<--license|licence>
+
+Shows the license information.
+
+=item B<--name> I<new_name>
+
+Specifies a new name for the meeting resource when updating.
+
+=item B<--set> I<name>
+
+Specifies the name of the configuration setting to modify.
+
+=item B<--status>
+
+Shows the operability status of Meqaris.
+
+=item B<--update> I<name>
+
+Update a meeting resource with the given name.
+
+=item B<--upgrade-db>
+
+Run the necessary Meqaris database structure upgrade scripts.
+
+=item B<--value> I<value>
+
+Specifies the new value of the configuration setting to modify using --set.
+If not provided, the setting is set to NULL.
+
+=item B<--version>
+
+Display Meqaris version information.
+
+=back
+
+=head1 CONFIG FILE
+
+Meqaris uses an INI file to hold the primary configuration. The file's
+default syntax is
+
+	[meqaris]
+	dbtype=postgresql
+	datadir=/var/lib/meqaris
+	log4perl_config_location=/var/lib/meqaris/meqaris-log4perl.cfg
+	lock_dir=/var/lock
+
+	[postgresql]
+	username=meqaris
+	password=meqaris-pass
+	dbname=meqaris
+	host=127.0.0.1
+	port=5432
+	connect_timeout=30
+
+The I<dbtype> parameter in the B<[meqaris]> section holds the type of the
+database and the name of the database settings' section.
+
+The I<datadir> parameter in the B<[meqaris]> section tells where the Meqaris'
+data files (SQL files) are.
+
+The I<log4perl_config_location> parameter in the B<[meqaris]> section gives the
+location of the configuration file for Log::Log4perl.
+
+The I<lock_dir> parameter in the B<[meqaris]> section gives the
+location of a directory suitable for lock files.
+
+The I<username> parameter in the B<[postgresql]> section gives the database
+username for the database.
+
+The I<password> parameter in the B<[postgresql]> section gives the database
+password for the provided username for the database.
+
+The I<dbname> parameter in the B<[postgresql]> section gives the name of the
+database to connect to.
+
+The I<host> parameter in the B<[postgresql]> section gives the hostname or an
+IP address of the database to connect to.
+
+The I<port> parameter in the B<[postgresql]> section gives the port number of
+the database to connect to.
+
+The I<connect_timeout> parameter in the B<[postgresql]> section gives the
+connection time-out value, in seconds.
+
+=head1 VERSION
+
+Version 1.4
+
+=head1 LICENSE
+
+GNU Affero General Public License version 3 or newer.
+
+=head1 AUTHOR
+
+Bogdan Drozdowski, bogdro (at) users . sourceforge . net
+
+=head1 SEE ALSO
+
+Meqaris homepage: https://meqaris.sourceforge.io/
+
+Meqaris manual: manual/en/index.html (in the package)
+
+Meqaris wiki: https://sourceforge.net/p/meqaris/wiki/Home/
+
+=cut

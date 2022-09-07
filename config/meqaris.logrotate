@@ -1,0 +1,9 @@
+/var/log/meqaris.log {
+	missingok
+	rotate 4
+	weekly
+	compress
+	notifempty
+	create
+	dateext
+}

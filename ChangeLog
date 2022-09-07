@@ -1,3 +1,54 @@
+2022-05-29	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 1.4:
+	  Recurring events with dates specified as periods are now supported.
+	  File-based locking re-enabled and moved to the database upgrade,
+	  together with a new INI setting. Event update checking improved.
+	  Database connection timeout can now be set. Improvements in command
+	  line processing. Updates in logs. Improvements in the build system.
+	  Improvements in documentation. Other small changes.
+	* bin/meqaris: Parse period values in the RDATE property, but do it
+	  separately. When merged into the original set, they change each
+	  element to a DateTime::Span of zero length and thus break the whole
+	  set. Improved checking for duplicate events (the sequence number was
+	  not mapped to a column name and it wasn't checked if the new
+	  sequence number or DTSTAMP were greater than the stored ones) and
+	  changed some code duplication in processing updates. Check if the
+	  parser directory is defined and is a directory and fall back to /tmp
+	  if not. The --update, --enable, --disable and --delete commands now
+	  display an error when the resource was not found.
+	* bin/meqaris (send_mail): Use more global variables instead of
+	  arguments to reduce code duplication and complication.
+	* config/meqaris.ini: Added a connection timeout and a lock directory.
+	* bin/meqaris (db_connect): Use the connection timeout parameter from
+	  the INI file, falling back to 30 seconds if missing.
+	* bin/meqaris (dblock): Un-comment the locking code from the main part
+	  of the code and move it to this new subroutine. Use the lock
+	  directory parameter from the INI file, falling back to /tmp if
+	  missing, to create the lock files. This is used during database
+	  upgrade where table-based locking cannot be yet used (the tables
+	  simply may not yet exist at that point). Changed the locking from
+	  sleep-create file to sysopen() - much faster and more reliable.
+	* config/meqaris.logrotate: Created a logrotate configuration.
+	* meqaris.pod: Created a POD file for Meqaris to make a manual page
+	  from.
+	* Makefile: Use default directories if they are not provided on the
+	  command line. Make and install a manual page during installation.
+	  Install a logrotate configuration during installation. Added an
+	  'uninstall' target. Added a separate variable for the list of files
+	  which are dependencies and are to be distributed. Use variables
+	  more.
+	* meqaris.spec: Use more constants instead of hard-coding the name.
+	  Added the manpage. Added the logrotate configuration.
+	* manual/en/usage-admin.html: Added the new parameters: 'lock_dir'
+	  and 'connect_timeout'.
+	* INSTALL-Meqaris.txt, manual/en/install.html: Added the new
+	  parameters: 'lock_dir' and 'connect_timeout'. Added installing and
+	  uninstalling the logrotate configuration. Added installing and
+	  uninstalling the documentation. Added running 'make uninstall'.
+	* README, manual/en/{readme,install}.html: Added the 'Fcntl' module
+	  as a dependency (it's a core module anyway).
+
 2022-05-23	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 1.2:

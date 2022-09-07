@@ -34,6 +34,7 @@
    <li>DateTime::TimeZone::ICal,</li>
    <li>DBD::Pg,</li>
    <li>DBI,</li>
+   <li>Fcntl,</li>
    <li>Getopt::Long,</li>
    <li>Log::Log4perl,</li>
    <li>MIME::Base64,</li>
@@ -140,6 +141,8 @@
    	The data files will be installed in <code>DATADIR/meqaris</code>,</li>
    <li><code>DOCDIR</code> - a directory for the Meqaris' documentation (like <code>/usr/share/doc</code>).
    	The documentation will be installed in <code>DOCDIR/meqaris</code>.</li>
+   <li><code>MANDIR</code> - a directory for the manual files (like <code>/usr/share/man</code>).
+   	The manual page will be installed in <code>MANDIR/man1</code>.</li>
   </ul></li>
 
  <li>Copy <code>bin/meqaris</code> to <code>BINDIR</code></li>
@@ -152,6 +155,11 @@
 
  <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code></li>
 
+ <li>Copy <code>config/meqaris.logrotate</code> to a directory expected to contain logrotate
+  configuration files (like <code>CONFDIR/logrotate.d</code>)</li>
+
+ <li>Copy the manual to a place suitable for documentation, like <code>/usr/share/doc</code></li>
+
 </ol>
 
 <p>
@@ -159,11 +167,12 @@ Alternatively, if you have the <code>make</code> program and some common Linux
 utilities, you can run <code>make install</code>, passing the target
 directories. Examples:</p>
  <pre>
-	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib DOCDIR=/usr/share/doc
+	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib DOCDIR=/usr/share/doc MANDIR=/usr/share/man
 	make install BINDIR=$HOME/tools/meqaris/bin \
 		CONFDIR=$HOME/tools/meqaris/etc \
 		DATADIR=$HOME/tools/meqaris/data \
-		DOCDIR=$HOME/tools/meqaris/doc</pre>
+		DOCDIR=$HOME/tools/meqaris/doc \
+		MANDIR=$HOME/tools/meqaris/man</pre>
 <p>
 All the above directories and their parent directories must be reachable by
 your mail server.
@@ -174,9 +183,10 @@ your mail server. Alternatively, the directory which would contain it must be
 writeable by your mail server.
 </p>
 <p>
-The necessary database structures will be created by the application itself
-while operating. You can also choose to run the database installation/upgrade
-scripts yourself by running
+The necessary database structures will be automatically created by the application itself
+while operating, but to avoid concurrent database upgrades (all of which
+except one would fail), it is recommended to run the database
+installation/upgrade scripts manually by calling
 </p>
 	<pre>	meqaris --upgrade-db</pre>
 
@@ -195,13 +205,15 @@ directory in the <code>[meqaris]</code> section under:
 	dbtype=postgresql
 	datadir=/path/to/meqaris/data
 	log4perl_config_location=/path/to/meqaris/data/meqaris-log4perl.cfg
+	lock_dir=/var/lock
 
 	[postgresql]
 	username=meqaris
 	password=meqaris-pass
 	dbname=meqaris
 	host=127.0.0.1
-	port=5432</pre>
+	port=5432
+	connect_timeout=30</pre>
 
 <p>
 Make sure that the <code>datadir</code> directory, the <code>log4perl_config_location</code> file
@@ -266,9 +278,13 @@ Restart the Postfix server (or reload its configuration) afterwards.
 
  <li>remove the <code>meqaris.ini</code> file from the directory you installed it to</li>
 
+ <li>remove the meqaris logrotate configurationfile from the directory you installed it to</li>
+
  <li>remove the <code>meqaris-log4perl.cfg</code> file from the directory you installed it to</li>
 
  <li>remove the application SQL file(s) from the directory you installed them to</li>
+
+ <li>remove the documentation file(s) from the directories you installed them to</li>
 
  <li>delete the application's database - run as <code>postgres</code>:
 
@@ -278,5 +294,22 @@ Restart the Postfix server (or reload its configuration) afterwards.
 
 	<pre>	dropuser meqaris</pre>
  </li>
+</ul>
+
+<p>
+Alternatively, if you have the 'make' program and some common Linux
+ utilities, you can run 'make uninstall', passing the the same directories
+ that were used during installation.
+ Examples:
+</p>
+	<pre>
+	make uninstall BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib \
+		DOCDIR=/usr/share/doc MANDIR=/usr/share/man
+	make uninstall BINDIR=$HOME/tools/meqaris/bin \
+		CONFDIR=$HOME/tools/meqaris/etc \
+		DATADIR=$HOME/tools/meqaris/data \
+		DOCDIR=$HOME/tools/meqaris/doc \
+		MANDIR=$HOME/tools/meqaris/man</pre>
+
 
 </body></html>
