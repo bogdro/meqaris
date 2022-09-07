@@ -1,5 +1,5 @@
 /*
- * Meqaris - the v3 database script.
+ * Meqaris - the v4 database script.
  *
  * Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
  *
@@ -27,10 +27,7 @@ Required for indices, triggers and their comments.
 set schema 'meqaris';
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_sending_method', null, 'The method to send mail replies: NULL=default, Mail::Internet, mail_command');
+values ('parser_tmp_dir', '/tmp', 'The path to a temporary directory for files with message parts. Default = /tmp. NULL means use the default.');
 
-insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_command', null, 'The command to pipe mail replies to when mail_sending_method="mail_command" (NULL = none)');
-
-update meqaris.meq_config set c_value = '3'
+update meqaris.meq_config set c_value = '5'
 where c_name = 'db_version';

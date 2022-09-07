@@ -21,7 +21,7 @@
 #
 
 NAME = meqaris
-VER = 0.7
+VER = 0.9
 
 RMDIR = /bin/rm -fr
 # when using '-p', no error is generated when the directory exists

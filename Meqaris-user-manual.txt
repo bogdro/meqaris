@@ -30,6 +30,11 @@ command. It should eventually display something similar to:
 	Database connection: OK
 	Database version: OK
 
+On ANSI-enabled terminals, the statuses will be shown in colour. You can set
+ the environment variable "ANSI_COLORS_DISABLED" to disable this, e.g.
+
+	ANSI_COLORS_DISABLED=1 meqaris --status
+
 Each database modification action causes Meqaris to check if the database
  version is the version expected by the application. If not, the required
  database upgrade scripts are run. You can also perform the database upgrade
@@ -64,6 +69,8 @@ If you plan to have real operating system-level users for your resources, you
 Once resources are added, you can start booking them - just send your
  invitations with the resources' configured e-mail addresses just like you
  would send invitations to other meeting participants.
+
+Warning: right now, only one Meqaris resource per e-mail is supported.
 
 To later modify the resource, if needed, use the --update parameter, passing
  the name of the resource to modify and the new parameters:
@@ -195,6 +202,9 @@ Currently, the following user-modifiable parameters are supported:
   and make sure that the file is writeable by the mail server's user.
   The setting is used only when mail_sending_method = "mail_command".
 
+- c_name = parser_tmp_dir: The path to a temporary directory for files with
+  message parts. Default = /tmp. NULL means use the default.
+
 -----------------------------------------------------------------------
 
 Troubleshooting
@@ -232,3 +242,5 @@ If you send e-mail invitation to Meqaris, but don't get a response, then:
 	meqaris --conf /path/to/meqaris.ini < your_mail.eml
 
    and examine the output.
+ - check the Meqaris' logs for more information. Increase the logging level
+   if necessary.

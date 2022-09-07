@@ -170,7 +170,7 @@ smtp_tls_security_level =
 smtpd_sasl_auth_enable = no
 smtpd_tls_security_level =
 
-And restart the Postfix server (or reload its configuration).
+Restart the Postfix server (or reload its configuration) afterwards.
 
 -----------------------------------------------------------------
 

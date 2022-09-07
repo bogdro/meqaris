@@ -1,3 +1,32 @@
+2022-05-08	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 0.9:
+	  The "From" field of the replies now contains the resource's name.
+	  It's now possible to set the directory where the mail parser keeps
+	  its temporary files. Resources marked with role=NON-PARTICIPANT in
+	  the invitation do not get booked. Events with no attendees are now
+	  ignored. Command line actions now print and log their results.
+	  Status output uses colours. Other small changes.
+	* bin/meqaris: The "From" field of the replies now contains the
+	  resource's name. Set the mail parser's temporary directory from the
+	  database configuration. Skip making a reservation if the value of
+	  the role is "NON-PARTICIPANT". Ignore the event if no attendees are
+	  assigned. Use Log4Perl's NDC (Nested Diagnostic Context) to add
+	  event UIDs to log lines automatically.
+	* bin/meqaris (send_mail): A new subroutine to send a response mail.
+	* bin/meqaris (db_connect, --status): Replaced the hard-coded
+	  'postgresql' INI section name with the value read from INI's
+	  "meqaris.dbtype" parameter.
+	* bin/meqaris (--status): Checking also Log4Perl's configuration. Use
+	  colours for statuses.
+	* sql/meqaris-v5.pgsql: New database file.
+	* sql/meqaris-full.pgsql: Added new configuration settings.
+	* Meqaris-user-manual.txt: Added information about the new setting.
+	  Added information about logs in the Troubleshooting section. Added
+	  a warning that only one Meqaris resource per e-mail is supported
+	  right now. Added information about colour statuses and how to
+	  disable them.
+
 2022-05-07	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 0.7:

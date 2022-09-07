@@ -113,7 +113,7 @@ insert into meqaris.meq_config (c_name, c_value, c_description)
 values ('mail_server_port', null, 'The port on the mail server to use (NULL = default)');
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('mail_sending_method', null, 'The method to send mail replies NULL=default, Mail::Internet, mail_command');
+values ('mail_sending_method', null, 'The method to send mail replies: NULL=default, Mail::Internet, mail_command');
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
 values ('mail_command', null, 'The command to pipe mail replies to when mail_sending_method="mail_command" (NULL = none)');
@@ -122,4 +122,7 @@ insert into meqaris.meq_config (c_name, c_value, c_description)
 values ('reply_detail_level', '0', 'An integer saying how much detailed will the replies be. 0 = the default.');
 
 insert into meqaris.meq_config (c_name, c_value, c_description)
-values ('db_version', '4', 'The current version of the Meqaris database');
+values ('parser_tmp_dir', '/tmp', 'The path to a temporary directory for files with message parts. Default = /tmp. NULL means use the default.');
+
+insert into meqaris.meq_config (c_name, c_value, c_description)
+values ('db_version', '5', 'The current version of the Meqaris database');
