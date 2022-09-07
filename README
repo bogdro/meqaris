@@ -1,0 +1,55 @@
+This is the README file for Meqaris.
+
+Meqaris (Meeting Equipment and Room Invitation System) is software that
+ allows booking meeting rooms and other resources (like mobile whiteboards,
+ projectors or conference sets) using the same e-mail invitations that
+ are used to invite participants to meetings.
+
+Meqaris allows to:
+
+- register meeting resources, like rooms or equipment,
+- send invitations to the resources (requires mail server support),
+- receive positive and negative replies.
+
+Requirements:
+
+- a system with Perl (https://www.perl.org/) installed, along with the
+  following modules (available from CPAN / https://metacpan.org/):
+  * Config::Simple,
+  * Data::ICal,
+  * DateTime::Format::ICal,
+  * DateTime::TimeZone::ICal,
+  * DBD::Pg,
+  * DBI,
+  * Getopt::Long,
+  * MIME::Base64,
+  * MIME::Parser,
+  with all their dependencies (the list may include but not be limited to:
+  Module::Install, Test::NoWarnings, Test::LongString, Class::Accessor,
+  DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
+  Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
+  DateTime::Event::Recurrence, DateTime::Set, Params::Validate,
+  Text::vFile::asData)
+
+- actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
+
+- a PostgreSQL database server (https://www.postgresql.org/), version 9.2
+  or newer, with the PL/pgSQL language installed.
+
+Author: Bogdan Drozdowski, bogdro (at) users . sourceforge . net
+
+License: GNU AGPL version 3 or newer.
+
+----------------------------------------------------------------
+
+Various versions of Meqaris were successfully used with the following
+ components in the following versions:
+
+1. PostgreSQL:
+	- 14.x (checked: 14.1)
+2. Perl:
+	- v5.34.0
+3. Postfix:
+	- 3.6.5
+
+Other versions may also work.

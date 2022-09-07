@@ -1,0 +1,11 @@
+2022-05-01	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 0.1:
+	  Initial version: accepting and declining invitations, automatic
+	  database creation, packaging. The following command-line options are
+	  supported: --conf, --create, --delete, --description, --destroy-db,
+	  --disable, --email, --enable, --help, --license, --name, --status,
+	  --update, --upgrade-db, --version. An INI-style configuration file
+	  is supported and an example provided. Basic database and user
+	  management scripts are provided. Installation instruction, a README
+	  file and a user manual are provided.

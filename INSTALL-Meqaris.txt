@@ -1,0 +1,186 @@
+	Meqaris (Meeting Equipment and Room Invitation System)
+
+			Installation instructions
+-----------------------------------------------------------------------
+
+---------------------------------
+Initial steps - most are one-time
+---------------------------------
+
+- The PostgreSQL database server must be installed, including the btree_gist
+  extension binary file (you may need to install the 'contrib' package, or
+  similar).
+
+- The PostgreSQL database server must be running.
+  On a Linux system, you would do one of:
+
+  * login to the system as the database user 'postgres' (you usually do
+    'su - postgres' as 'root' to login to that account) and run:
+
+	pg_ctl start
+
+  * login as 'root' and run:
+
+	systemctl start postgresqlXX (XX being the version)
+
+  * login as 'root' and run:
+
+	service postgresql start
+
+- Create the database user to host the application's database,
+  e.g. run as 'postgres':
+
+	createuser -P meqaris
+
+- Create the application's database, e.g. run as 'postgres':
+
+	createdb -O meqaris meqaris
+
+- A procedural language suitable for the database must be installed in the
+  logical database.
+  Login to the system as the database user 'postgres' and run:
+
+	createlang plpgsql meqaris
+	(don't worry if it says that the language already exists).
+
+- Database access rules must be created within the database server unless you
+  wish to leave the default rules.
+  Login to the system as the database user 'postgres' or 'root' and run:
+
+	cp /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf-backup
+	echo local meqaris meqaris scram-sha-256 >> /var/lib/pgsql/data/pg_hba.conf
+	echo host all all 127.0.0.1/32 scram-sha-256 >> /var/lib/pgsql/data/pg_hba.conf
+
+  (Note the double ">>" - it's CRUCIAL to use double ">>", a single ">" would
+  OVERWRITE the target file).
+
+	On older PostgreSQL versions replace 'scram-sha-256' with 'md5'.
+
+  If you'll need to access the database from another computer:
+
+  * a line similar to the 'host all all 127.0.0.1/32 scram-sha-256' should
+    be added to pg_hba.conf, containing the correct IP address,
+  * firewall rules may need to be adjusted
+  * the '/etc/hosts.allow' file (tcpwrappers) may need to be adjusted
+
+- After changing the access rules for the database server, restart it.
+  On Linux, you would do one of:
+
+  * login to the system as the database user 'postgres' and run:
+
+	pg_ctl reload
+
+  * login as 'root' and run:
+
+	systemctl restart postgresqlXX (XX being the version)
+
+  * login as 'root' and run:
+
+	service postgresql restart
+
+------------------------
+Application installation
+------------------------
+
+- Copy bin/meqaris to a directory expected to contain binaries, like /usr/bin
+
+- copy the contents of the 'sql' directory to a directory expected to contain
+  application data files, like /var/lib/meqaris/
+
+- copy config/meqaris.ini to a directory expected to contain configuration
+  files, like /etc
+
+Alternatively, if you have the 'make' program and some common Unix/Linux
+  utilities, you can run 'make install', passing the prefix of the target
+  directory. Examples:
+
+	make install BINDIR=/usr/bin CONFDIR=/etc DATADIR=/var/lib
+	make install BINDIR=$HOME/tools/meqaris/bin \
+		CONFDIR=$HOME/tools/meqaris/etc \
+		DATADIR=$HOME/tools/meqaris/data
+
+All the above directories and their parent directories must be reachable by
+ your mail server.
+
+The necessary database structures will be created by the application itself
+while operating. You can also choose to run the database installation/upgrade
+scripts yourself by running
+
+	meqaris --upgrade-db
+
+-------------------------
+Meqaris configuration
+-------------------------
+
+You need to edit the meqaris.ini file to set the proper values for database
+ access in the [postgresql] section and your chosen application data files'
+ directory in the [meqaris] section under the 'datadir' key:
+
+[meqaris]
+dbtype=postgresql
+datadir=/path/to/meqaris/data
+
+[postgresql]
+username=meqaris
+password=meqaris-pass
+dbname=meqaris
+host=127.0.0.1
+port=5432
+
+-------------------------
+Mail server configuration
+-------------------------
+
+Consult your mail server manual about how to make it send e-mails addressed
+ to your resources (rooms, etc.) to the Meqaris script and how to accept the
+ replies.
+
+For Postfix, you can edit the /etc/postfix/aliases file and add the right
+ command there. It must being with the "pipe" symbol - "|" - so that the
+ Meqaris script receives the mail on the so-called "standard input".
+
+Assuming you want a "room 1" alias and everything is installed in the default
+ paths, the simplest entry in the 'aliases' file could be:
+
+room1: |"meqaris"
+
+Assuming you want a "room 1" alias and everything is installed NOT in the
+ default paths, the most complicated entry in the 'aliases' file could be:
+
+room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"
+
+For a passwordless, local-only mail submission, add this to your
+ /etc/postfix/main.cf file:
+
+inet_interfaces = localhost
+inet_protocols = all
+mynetworks_style = host
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated reject_unauth_destination
+smtp_sasl_auth_enable = no
+smtp_tls_security_level =
+smtpd_sasl_auth_enable = no
+smtpd_tls_security_level =
+
+And restart the Postfix server (or reload its configuration).
+
+-----------------------------------------------------------------
+
+Uninstallation
+--------------
+
+To uninstall, if needed:
+
+- remove the 'meqaris' script from the directory you installed it to
+
+- remove the meqaris.ini file from the directory you installed it to
+
+- remove the application SQL file(s) from the directory you installed them to
+
+- delete the application's database - run as 'postgres':
+
+	dropdb meqaris
+
+- delete the application's database user - run as 'postgres':
+
+	dropuser meqaris
+

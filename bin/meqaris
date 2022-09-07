@@ -1,0 +1,611 @@
+#!/usr/bin/perl
+#
+# Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
+#
+# This file is part of Meqaris (Meeting Equipment and Room Invitation System),
+#  software that allows booking meeting rooms and other resources using
+#  e-mail invitations.
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+use Config::Simple;
+use Data::ICal;
+use DateTime::Format::ICal;
+use DateTime::TimeZone::ICal;
+use DBI;
+use Getopt::Long;
+use MIME::Base64 qw(encode_base64);
+use MIME::Parser;
+
+my $meqaris_version = '0.1';
+my $meqaris_dbversion = 1;
+
+# ============================ Command line processing =======================
+
+Getopt::Long::Configure('ignore_case', 'ignore_case_always');
+
+my $config_file = '/etc/meqaris.ini';
+my $create = '';
+my $delete = '';
+my $description = '';
+my $destroy_db = '';
+my $disable = '';
+my $email = '';
+my $enable = '';
+my $help = '';
+my $lic = '';
+my $name = '';
+my $status = '';
+my $update = '';
+my $upgrade_db = '';
+my $version = '';
+
+if ( !GetOptions (
+	'conf=s'		=> \$config_file,
+	'create=s'		=> \$create,
+	'delete=s'		=> \$delete,
+	'description=s'		=> \$description,
+	'destroy-db'		=> \$destroy_db,
+	'disable=s'		=> \$disable,
+	'email=s'		=> \$email,
+	'enable=s'		=> \$enable,
+	'h|help|?'		=> \$help,
+	'license|licence'	=> \$lic,
+	'name=s'		=> \$name,
+	'status'		=> \$status,
+	'update=s'		=> \$update,
+	'upgrade-db'		=> \$upgrade_db,
+	'version'		=> \$version,
+	)
+   ) {
+	print_help();
+	exit 1;
+}
+
+if ( $lic ) {
+	print
+		"Meqaris (Meeting Equipment and Room Invitation System)\n" .
+			"- software that allows booking meeting rooms and other resources\n" .
+			" using e-mail invitations\n" .
+			"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
+			"  This program is free software: you can redistribute it and/or modify\n" .
+			"  it under the terms of the GNU Affero General Public License as published by\n" .
+			"  the Free Software Foundation, either version 3 of the License, or\n" .
+			"  (at your option) any later version.\n\n" .
+			"  This program is distributed in the hope that it will be useful,\n" .
+			"  but WITHOUT ANY WARRANTY; without even the implied warranty of\n" .
+			"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n" .
+			"  GNU Affero General Public License for more details.\n\n" .
+			"  You should have received a copy of the GNU Affero General Public License\n" .
+			"  along with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
+		;
+	exit 0;
+}
+
+if ( $help ) {
+	print_help();
+	exit 0;
+}
+
+if ( $version ) {
+	print "Meqaris version $meqaris_version\n";
+	exit 0;
+}
+
+my %cfg;
+Config::Simple->import_from($config_file, \%cfg);
+
+if ( $status ) {
+
+	my $error = 0;
+	if ( Config::Simple->error() ) {
+		print "Configuration file '$config_file': ERROR: " . Config::Simple->error() . "\n";
+		$error = 1;
+	} else {
+		print "Configuration file '$config_file': OK\n";
+	}
+
+	if ( ! $error ) {
+
+		for my $k ('meqaris.dbtype', 'meqaris.datadir',
+			'postgresql.username', 'postgresql.password',
+			'postgresql.dbname', 'postgresql.host',
+			'postgresql.port' ) {
+
+			if ( ! defined ($cfg{$k}) ) {
+				print "Configuration file '$config_file': ERROR: Missing: $k\n";
+				$error = 1;
+			}
+		}
+	}
+	if ( ! $error ) {
+
+		if ( ! -d "$cfg{'meqaris.datadir'}/sql" ) {
+			print "Data directory: ERROR: '$cfg{'meqaris.datadir'}/sql' is not a directory\n";
+			$error = 1;
+		} else {
+			print "Data directory: '$cfg{'meqaris.datadir'}': OK\n";
+		}
+	}
+	if ( ! $error ) {
+
+		my $dbh = db_connect();
+		exit 2 unless $dbh;
+		print "Database connection: OK\n";
+		my $db_ver = db_version ($dbh);
+		if ( $meqaris_dbversion == $db_ver ) {
+			print "Database version: OK\n";
+		} else {
+			print "Database version: ERROR: expected $meqaris_dbversion, got $db_ver\n" .
+				"You may need to run 'meqaris --upgrade-db'.\n";
+			$error = 2;
+		}
+		$dbh->disconnect;
+	}
+	exit $error;
+}
+
+if ( $create ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	exit 2 unless db_upgrade ($dbh);
+	my $stmth = db_stmt ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
+	exit 2 unless $stmth;
+	$stmth->execute($create, $email, $description);
+	if ( $dbh->errstr ) {
+		print "Database: ERROR: cannot create resource: " . $dbh->errstr . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	exit 0;
+}
+
+if ( $delete ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	exit 2 unless db_upgrade ($dbh);
+	my $stmth = db_stmt ($dbh, 'delete from meqaris.meq_resources where r_name = $1');
+	exit 2 unless $stmth;
+	$stmth->execute($delete);
+	if ( $dbh->errstr ) {
+		print "Database: ERROR: cannot delete resource: " . $dbh->errstr . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	exit 0;
+}
+
+if ( $destroy_db ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	my $stmth = db_stmt ($dbh, 'drop schema meqaris cascade');
+	exit 2 unless $stmth;
+	$stmth->execute();
+	if ( $dbh->errstr ) {
+		print "Database: ERROR: cannot destroy the database schema: " . $dbh->errstr . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	exit 0;
+}
+
+if ( $disable ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	exit 2 unless db_upgrade ($dbh);
+	my $stmth = db_stmt ($dbh, 'update meqaris.meq_resources set r_enabled = false where r_name = $1');
+	exit 2 unless $stmth;
+	$stmth->execute($disable);
+	if ( $dbh->errstr ) {
+		print "Database: ERROR: cannot disable resource: " . $dbh->errstr . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	exit 0;
+}
+
+if ( $enable ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	exit 2 unless db_upgrade ($dbh);
+	my $stmth = db_stmt ($dbh, 'update meqaris.meq_resources set r_enabled = true where r_name = $1');
+	exit 2 unless $stmth;
+	$stmth->execute($enable);
+	if ( $dbh->errstr ) {
+		print "Database: ERROR: cannot enable resource: " . $dbh->errstr . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	exit 0;
+}
+
+if ( $update ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	exit 2 unless db_upgrade ($dbh);
+	my $sql = 'update meqaris.meq_resources set ';
+	my $first = 1;
+	my $par_cnt = 2;
+	my @values = ($update);
+	if ( $name ne '' ) {
+
+		$sql .= "r_name = \$$par_cnt";
+		push @values, $name;
+		$first = 0;
+		$par_cnt++;
+	}
+	if ( $email ne '' ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "r_email = \$$par_cnt";
+		push @values, $email;
+		$first = 0;
+		$par_cnt++;
+	}
+	if ( $description ne '' ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "r_description = \$$par_cnt";
+		push @values, $description;
+		$first = 0;
+		$par_cnt++;
+	}
+
+	$sql .= ' where r_name = $1';
+
+	my $stmth = db_stmt ($dbh, $sql);
+	exit 2 unless $stmth;
+	$stmth->execute(@values);
+	if ( $dbh->errstr ) {
+		print "Database: ERROR: cannot update resource: " . $dbh->errstr . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	exit 0;
+}
+
+if ( $upgrade_db ) {
+
+	my $dbh = db_connect();
+	exit 2 unless $dbh;
+	exit 2 unless db_upgrade ($dbh);
+	$dbh->disconnect;
+	exit 0;
+}
+
+# ============================ Input processing ===================================
+
+my $parser = new MIME::Parser;
+$parser->output_dir('/tmp');
+$parser->output_prefix('meqaris-msg');
+my $entity = $parser->parse(\*STDIN) or die "Standard input parsing failed\n";
+
+my @parts = $entity->parts;
+
+my $sender = $entity->head->get('From', 0);
+my $subject = $entity->head->get('Subject', 0);
+my $reply_sender = '';
+my $response_type = '';
+
+my $dbh = db_connect();
+exit 2 unless $dbh;
+exit 2 unless db_upgrade ($dbh);
+
+my $res = $dbh->selectall_hashref ('select r_id, r_name, r_email, r_enabled from meqaris.meq_resources', 'r_email');
+my $processed = 0;
+
+for my $p (@parts) {
+
+	if ( $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics' ) {
+
+		# bodyhandle() runs the decoding, as_string() doesn't
+		my $orig_invitation = $p->bodyhandle->as_string;
+		my $ical = Data::ICal->new(data => $orig_invitation);
+
+		# Check the method property. ARRAY! List context required!
+		my ($method) = @{$ical->property('METHOD')};
+		next if $method->value ne 'REQUEST';
+
+		my $calendar_reply = Data::ICal->new(rfc_strict => 1);
+		# Read the time zones, if any:
+		my (%vtz, @vevents);
+		for my $entry (@{$ical->entries}) {
+
+			my $type = $entry->ical_entry_type;
+			if ( $type eq 'VEVENT' ) {
+
+				push @vevents, $entry;
+			}
+			elsif ( $type eq 'VTIMEZONE' ) {
+
+				my $dtz = DateTime::TimeZone::ICal->from_ical_entry($entry);
+				$vtz{$dtz->name} = $dtz;
+			}
+		}
+
+		# Add timezone information to events:
+		EV: for my $event (@vevents) {
+
+			# Get the meeting properties. ARRAY! List context required!
+			my ($dtstart) = @{$event->property('dtstart')};
+			my ($dtend) = @{$event->property('dtend')};
+			my ($uid) = @{$event->property('uid')};
+			my ($organizer) = @{$event->property('organizer')};
+			my ($dtstamp) = $event->property('dtstamp')? @{$event->property('dtstamp')} : undef;
+			my ($sequence) = $event->property('sequence')? @{$event->property('sequence')} : undef;
+			my ($summary) = @{$event->property('summary')};
+			$organizer =~ s/^mailto://io;
+
+			# Get the timezone ID from the parameters:
+			my $tzid_start = $dtstart->parameters->{'TZID'};
+			my $tzid_end = $dtend->parameters->{'TZID'};
+
+			# Convert the dates to the timezone:
+			my $dt_start = DateTime::Format::ICal->parse_datetime($dtstart->value);
+			my $dt_end = DateTime::Format::ICal->parse_datetime($dtend->value);
+
+			# The datetime is changed to be 'floating'
+			$dt_start->set_time_zone($vtz{$tzid_start}) if $tzid_start and $vtz{$tzid_start};
+			$dt_end->set_time_zone($vtz{$tzid_end}) if $tzid_end and $vtz{$tzid_end};
+
+			# Find an attendee matching one of our resources
+			# and set the reply as ACCEPTED if the timeslot is free
+			# (if the database allows the insert) and DECLINED
+			# otherwise or on any error.
+			for my $attendee (@{$event->property('attendee')}) {
+
+				# Get the raw e-mail address:
+				($reply_sender = $attendee->value) =~ s/^mailto://io;
+				# Skip if not one of our resources:
+				next if ! defined ($res->{$reply_sender});
+				# Attendee found - try to insert the meeting:
+				my $stmth = db_stmt ($dbh,
+					'insert into meqaris.meq_resource_reservations ' .
+					'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+					'values ($1, $2, $3, $4, $5, $6, $7, $8)');
+				if ( $stmth ) {
+
+					my @values = (
+						$res->{$reply_sender}->{'r_id'},
+						"[$dt_start, $dt_end)",
+						$organizer->value,
+						$summary->value,
+						(defined ($dtstamp))? $dtstamp->value : undef,
+						$uid->value,
+						(defined ($sequence))? $sequence->value : 0,
+						encode_base64 ($orig_invitation)
+						);
+					$stmth->execute(@values);
+					if ( $dbh->errstr ) {
+
+						# DB error - reject
+						$response_type = 'Declined';
+						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+					} else {
+						$response_type = 'Accepted';
+						$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+					}
+				}
+				else {
+					# DB error - reject
+					$response_type = 'Declined';
+					$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+				}
+				$calendar_reply->add_entry($event);
+				last EV;
+			}
+		}
+		if ( $response_type ne '' ) {
+
+			$calendar_reply->add_property('PRODID', "Meqaris $meqaris_version");
+			$calendar_reply->add_property('METHOD', 'REPLY');
+			my $mail = MIME::Entity->build (
+				#Type => 'multipart/mixed', # set automatically
+				From => $reply_sender,
+				To => $sender,
+				Subject => substr ("$response_type: $subject", 0, 78), # length - rfc2822
+				Encoding => 'quoted-printable',
+				Data => [
+						"$response_type: $subject\n",
+						"-- \n",
+						"Generated by Meqaris version $meqaris_version\n"
+					]
+			);
+			$mail->head->add('Comments', "Generated by Meqaris version $meqaris_version");
+			$mail->attach(
+				Data => $calendar_reply->as_string,
+				Type => 'text/calendar; method=REPLY',
+				Encoding => 'base64'
+			);
+			$mail->smtpsend(
+				MailFrom => $reply_sender,
+				To => $sender
+				);
+			$processed = 1;
+		}
+	}
+	# Process just one invitation per each e-mail. Various mail clients
+	# may sen the same invitation using different MIME types, so reply
+	# to just the first one successfully processed and stop processing
+	# to avoid conflicts and unnecessary meeting rejections.
+	last if $processed;
+}
+
+$parser->filer->purge;
+
+# ============================ Subroutines: ===================================
+
+# ============================ print_help ===================================
+
+sub print_help {
+
+	print
+		"Meqaris (Meeting Equipment and Room Invitation System)\n" .
+			"- software that allows booking meeting rooms and other resources\n" .
+			" using e-mail invitations\n" .
+			"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
+			"Syntax: meqaris [options]\n\n" .
+			"Options:\n" .
+			"--conf <file>\t\t\tUse the given configuration file\n" .
+			"--create <name>\t\t\tCreate a new meeting resource\n" .
+			"--delete <name>\t\t\tDelete a meeting resource with the given name\n" .
+			"--description <desc>\t\tSpecifies a description for a meeting resource when creating or updating\n" .
+			"--destroy-db\t\t\tDestroys the Meqaris schema on the database\n" .
+			"--disable <name>\t\tDisables the meeting resource with the given name\n" .
+			"--email <e-mail address>\tSpecifies an e-mail address for the meeting resource when creating or updating\n" .
+			"--enable <name>\t\t\tEnables the meeting resource with the given name\n" .
+			"-h|--help|-?\t\t\tShows this help message\n" .
+			"--license|licence\t\tShows the license information\n" .
+			"--name <name>\t\t\tSpecifies a new name for the meeting resource when updating\n" .
+			"--status\t\t\tShows the operatibility status of Meqaris\n" .
+			"--update <name>\t\t\tUpdate a meeting resource with the given name\n" .
+			"--upgrade-db\t\t\tRun the necessary Meqaris database structure upgrade scripts\n" .
+			"--version\t\t\tDisplay Meqaris version information\n"
+		;
+}
+
+# ============================ db_connect ===================================
+
+sub db_connect {
+
+	my $dbh = DBI->connect(
+		"dbi:Pg:dbname=$cfg{'postgresql.dbname'};" .
+		"host=$cfg{'postgresql.host'};" .
+		"port=$cfg{'postgresql.port'};", 
+		$cfg{'postgresql.username'},
+		$cfg{'postgresql.password'},
+		{AutoCommit => 1, RaiseError => 0, PrintError => 0});
+	if ( ! $dbh ) {
+		print "Database connection: ERROR: cannot connect: " . $DBI::errstr . "\n";
+	}
+	return $dbh;
+}
+
+# ============================ db_stmt ===================================
+
+sub db_stmt {
+
+	my $dbh = shift;
+	my $sql = shift;
+	my $stmth = $dbh->prepare ($sql);
+	if ( ! $stmth ) {
+		print "Database: ERROR: cannot create statement: " . $dbh->errstr . "\n";
+	}
+	return $stmth;
+}
+
+# ============================ db_version ===================================
+
+sub db_version {
+
+	my $dbh = shift;
+	my $stmth = db_stmt ($dbh, "select c_value from meqaris.meq_config where c_name = 'db_version'");
+	return 0 unless $stmth;
+	$stmth->execute();
+	if ( $dbh->errstr ) {
+		# this CAN be a normal situation, e.g. on first install
+		#print "Database: ERROR: cannot get version: " . $dbh->errstr . "\n";
+		return 0;
+	}
+	my $db_ver = $stmth->fetchrow_arrayref;
+	return $db_ver->[0];
+}
+
+# ============================ db_run_file ===================================
+
+sub db_run_file {
+
+	my $dbh = shift;
+	my $filename = shift;
+
+	open (my $f, '<', $filename);
+	if ( ! defined ($f) ) {
+
+		print "Database upgrade: ERROR: cannot open file '$filename': $!\n";
+		return 0;
+	}
+	my @lines = <$f>;
+	close $f;
+
+	my $stmth = db_stmt ($dbh, join ("\n", @lines));
+	return 0 unless $stmth;
+	$stmth->execute();
+	if ( $dbh->errstr ) {
+		print "Database upgrade: ERROR: cannot execute file '$filename': " . $dbh->errstr . "\n";
+		return 0;
+	}
+	return 1;
+}
+
+# ============================ db_upgrade ===================================
+
+sub db_upgrade {
+
+	my $dbh = shift;
+	my $db_ver = db_version ($dbh);
+
+	if ( $meqaris_dbversion != $db_ver ) {
+
+		if ( $db_ver == 0 ) {
+
+			# new database - just run the full script (in a transaction)
+			$dbh->begin_work();
+			if (! db_run_file ($dbh, "$cfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
+
+				print  "Can't update database version to $meqaris_dbversion.\n";
+				$dbh->rollback();
+				return 0;
+			}
+			$dbh->commit();
+		}
+		elsif ($db_ver < $meqaris_dbversion) {
+
+			# run just the missing scripts, one at a time, each
+			# in its own transaction
+			for (my $i = $db_ver + 1; $i <= $meqaris_dbversion; $i++) {
+
+				$dbh->begin_work();
+				if (! db_run_file ($dbh, "$cfg{'meqaris.datadir'}/sql/meqaris-v$i.pgsql") ) {
+
+					print  "Can't update database version from $db_ver to $meqaris_dbversion\n";
+					$dbh->rollback();
+					return 0;
+				}
+				$dbh->commit();
+			}
+		}
+		elsif ($db_ver > $meqaris_dbversion) {
+
+			print "Database version $db_ver is newer than the expected version $meqaris_dbversion.\n" .
+				"The application may behave improperly.\n" .
+				"You can continue or leave and install the correct application version.\n";
+			return 0;
+		}
+	}
+	return 1;
+}

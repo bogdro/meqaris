@@ -1,0 +1,148 @@
+	Meqaris (Meeting Equipment and Room Invitation System)
+
+			User's Manual
+-----------------------------------------------------------------------
+
+To get simple help on the command line, run
+
+	meqaris --help
+
+Meqaris uses an INI file to hold the primary configuration, like database
+ access settings, and a PostgreSQL database to hold the meeting resources
+ (rooms and equipment), the booked meetings/events and some of the
+ configuration.
+
+To override the default configuration file path, use the --conf parameter,
+ passing the full path to the configuration file:
+
+	meqaris --conf /path/to/meqaris.ini
+
+You can pass this parameter to each of the commands Meqaris supports.
+
+To check if the configuration file is correct, you can run the
+
+	meqaris --status
+
+command. It should eventually display something similar to:
+
+	Configuration file '/path/to/meqaris.ini': OK
+	Data directory: '/path/to/meqaris/data': OK
+	Database connection: OK
+	Database version: OK
+
+Each database modification action causes Meqaris to check if the database
+ version is the version expected by the application. If not, the required
+ database upgrade scripts are run. You can also perform the database upgrade
+ manually by running the
+
+	meqaris --upgrade-db
+
+command and check the status afterwards.
+
+To begin booking meeting resources, you need to create those resources in the
+ Meqaris system. To do that, use the --create parameter:
+
+	meqaris --create 'Room 100' --description 'Room 100, first floor'
+		--email 'room100@yourdomain'
+
+	meqaris --create 'Projector HD 1' --description 'Mobile HD projector'
+		--email 'hdproj1@yourdomain'
+
+	meqaris --create 'Teleconference set X-2'
+		--description 'Teleconference set: TV + speaker + microphone'
+		--email 'telco_set_x2@yourdomain'
+
+The name (after the --create parameter) is required. The description is
+ optional and is just for users. The e-mail address is also required,
+ otherwise the resource wouldn't "know" that the invitation is meant for it.
+
+Once resources are added, you can start booking them - just send your
+ invitations with the resources' configured e-mail addresses just like you
+ would send invitations to other meeting participants.
+
+To later modify the resource, if needed, use the --update parameter, passing
+ the name of the resource to modify and the new parameters:
+
+	meqaris --update 'Teleconference set X-2'
+		--name 'Teleconference set X-3'
+		--description 'Teleconference set: HDTV + 2 speakers + mic'
+		--email 'telco_set_x3@yourdomain'
+
+To temporarily disable a resource from being booked, run
+
+	meqaris --disable 'Room 100'
+
+To re-enable a temporarily-disabled resource to be allowed to be booked
+ again, run
+
+	meqaris --enable 'Room 100'
+
+To permanently delete a resource, run
+
+	meqaris --delete 'Room 100'
+
+After this, you need to re-create the resource in order to use it again.
+ Resources which have meetings booked (even past) cannot be deleted right now.
+
+To completely delete the Meqaris data and database structures in the
+ database, run
+
+	meqaris --destroy-db
+
+The database structures will be re-created by Meqaris upon receiving the
+ first invitation or the first command that modifies the database (except
+ '--destroy-db'), which includes running
+
+	meqaris --upgrade-db
+
+Finally,
+
+	meqaris --license
+	meqaris --licence
+
+displays Meqaris license information, and
+
+	meqaris --version
+
+displays Meqaris version information.
+
+You can use the provided 'scripts/mkdump.sh' script to make a database backup
+ which can later be restored using the 'scripts/restoredb.sh' script.
+
+-----------------------------------------------------------------------
+
+Troubleshooting
+---------------
+
+If you get errors similar to:
+
+	Can't locate X in @INC (you may need to install the X module)
+
+then make sure that all the required Perl modules and their dependencies are
+ installed. If you installed them in non-standard locations, you may need to
+ run Meqaris by using the 'perl' command and pass the required paths in the
+ '-I' parameter, e.g.
+
+    perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini
+
+If the --status command displays something like:
+
+	Configuration file '/path/to/meqaris.ini': OK
+	Data directory: '/path/to/meqaris/data': OK
+	Database connection: ERROR: cannot connect: connection to server at
+	 "127.0.0.1", port 5432 failed: Connection refused
+         Is the server running on that host and accepting TCP/IP connections?
+
+then check:
+ - if the database connection parameters in the INI file are correct,
+ - if the database is actually running
+
+If you send e-mail invitation to Meqaris, but don't get a response, then:
+ - check your mail server configuration if the invitations are properly
+   passed to Meqaris
+ - check your mail server logs if the invitations were in fact sent to Meqaris
+ - save your e-mail to a text file, send it to Meqaris by hand:
+
+	meqaris --conf /path/to/meqaris.ini < your_mail.eml
+
+   and examine the output.
