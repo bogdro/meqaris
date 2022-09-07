@@ -23,6 +23,7 @@ Requirements:
   * DBD::Pg,
   * DBI,
   * Getopt::Long,
+  * Log::Log4perl,
   * MIME::Base64,
   * MIME::Parser,
   with all their dependencies (the list may include but not be limited to:
@@ -31,8 +32,8 @@ Requirements:
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
 
-  The Log::Log4perl module is optional, but can be of great help with logging
-  when problems occur.
+  The Log::Log4perl module should be optional, but can be of great help with
+  logging when problems occur.
 
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
 

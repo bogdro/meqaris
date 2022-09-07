@@ -1,3 +1,31 @@
+2022-05-19	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 1.1:
+	  Booking multiple resources in one invitation works correctly now.
+	  Allow operating (with a warning) when the database is newer than
+	  expected. Other small improvements.
+	* bin/meqaris: Allow operating when the database version is greater
+	  than the expected value. Improved checking for duplicate events.
+	  DTSTAMP is now stored converted using its time zone (if any). Added
+	  "process ID" output to the initial logger. Other small updates.
+	  Display an ERROR in --status if the DBD::Pg database module is not
+	  installed.
+	* config/meqaris-log4perl.cfg: Added "process ID" output to logger.
+	* Makefile: Removed forcing the GNU 'tar' format so that each 'tar'
+	  can be used for making packages. The user manual in text format is
+	  no longer distributed, in favour of the HTML version. Removed the
+	  world-writeable access mode from $(DATADIR)/meqaris.
+	* meqaris.spec: Added the DBD::Pg module as an RPM dependency. Removed
+	  the world-writeable access mode from /var/lib/meqaris.
+	* manual/en/usage-admin.html: Small updates.
+	* manual/en/usage-{admin,user}.html, Meqaris-user-manual.txt: Removed
+	  the warning saying that inviting multiple resources in one
+	  invitation can result in invalid replies.
+	* INSTALL-Meqaris.txt, README, manual/en/{readme,install}.html: Made
+	  the Log::Log4perl mandatory for the time being.
+	* INSTALL-Meqaris.txt, manual/en/install.html: The data directory is
+	  no longer required to be world-writeable access.
+
 2022-05-16	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 1.0:

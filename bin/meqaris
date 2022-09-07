@@ -35,7 +35,7 @@ use MIME::Base64 qw(encode_base64);	# core
 use MIME::Parser;
 use Term::ANSIColor qw(:constants);	# core (5.6.0)
 
-my $meqaris_version = '1.0';
+my $meqaris_version = '1.1';
 my $meqaris_dbversion = 6;
 
 # ============================ Loggers: ===================================
@@ -54,12 +54,10 @@ eval {
 	# some default configuration
 	my $config_text = q(
 		log4perl.rootLogger = WARN, Screen
-
-		log4perl.appender.Screen        = Log::Log4perl::Appender::Screen
+		log4perl.appender.Screen = Log::Log4perl::Appender::Screen
 		log4perl.appender.Screen.stderr = 1
-		#log4perl.appender.Screen.layout = Log::Log4perl::Layout::SimpleLayout
 		log4perl.appender.Screen.layout = Log::Log4perl::Layout::PatternLayout
-		log4perl.appender.Screen.layout.ConversionPattern = [%d{yyyy-MM-dd HH:mm:ss}] %p - %m%n
+		log4perl.appender.Screen.layout.ConversionPattern = [%d{yyyy-MM-dd HH:mm:ss}][PID=%P] %p - %m%n
 		);
 	use Log::Log4perl;
 	Log::Log4perl->init (\$config_text);
@@ -176,7 +174,7 @@ if ( ! is_empty ($cfg{'meqaris.log4perl_config_location'}) ) {
 
 if ( $status ) {
 
-	log_debug "Got --status";
+	log_debug 'Got --status';
 
 	my $error = 0;
 	if ( Config::Simple->error() ) {
@@ -236,6 +234,13 @@ if ( $status ) {
 		} else {
 			print "Data directory: '$cfg{'meqaris.datadir'}': ",
 				BOLD, GREEN, 'OK', RESET, "\n";
+		}
+	}
+	if ( ! $error ) {
+		eval 'use DBD::Pg;'; 
+		if ($@) {
+			print 'Database connection: ', BOLD, RED, 'ERROR', RESET, ": Module DBD::Pg not installed\n";
+			$error = 2;
 		}
 	}
 	if ( ! $error ) {
@@ -307,7 +312,7 @@ if ( $delete ) {
 
 if ( $destroy_db ) {
 
-	log_debug "Got --destroy-db";
+	log_debug 'Got --destroy-db';
 
 	my $dbh = db_connect();
 	exit 2 unless $dbh;
@@ -462,43 +467,45 @@ if ( $upgrade_db ) {
 
 # ============================ Locking ===================================
 
+my $lock_filename = undef;
+
 # simple non-perfect colision aviodance system
-sleep (( ($$ % 10) + (time % 10) ) % 10);
-
-my $lock_filename = "$cfg{'meqaris.datadir'}/meqaris.lck";
-my $start_time = time;
-
-log_trace "Process $$ waiting for lock";
-
-while ( time < $start_time + 30 ) {
-
-	last if ! -e $lock_filename;
-	sleep 1;
-}
-
-log_trace "Process $$ waiting for lock finished";
-
-if ( time >= $start_time + 30 ) {
-
-	log_fatal "Lock file exists: '$lock_filename'. Cannot continue.";
-	exit 5;
-}
-
-log_trace "Process $$ creating the lock file";
-
-open (my $lock_fd, '>', $lock_filename);
-if ( defined ($lock_fd) ) {
-
-	close $lock_fd; # the file itself is not needed, as long as it exists
-}
-else {
-	log_warn "Lock file '$lock_filename' cannot be created."
-		. " Will continue, but concurrent booking of resources may give strange results.";
-}
+# sleep (( ($$ % 10) + (time % 10) ) % 10);
+# 
+# $lock_filename = "$cfg{'meqaris.datadir'}/meqaris.lck";
+# my $start_time = time;
+# 
+# log_trace 'Waiting for lock';
+# 
+# while ( time < $start_time + 30 ) {
+# 
+# 	last if ! -e $lock_filename;
+# 	sleep 1;
+# }
+# 
+# log_trace 'Waiting for lock finished';
+# 
+# if ( time >= $start_time + 30 ) {
+# 
+# 	log_fatal "Lock file exists: '$lock_filename'. Cannot continue.";
+# 	exit 5;
+# }
+# 
+# log_trace 'Creating the lock file';
+# 
+# open (my $lock_fd, '>', $lock_filename);
+# if ( defined ($lock_fd) ) {
+# 
+# 	close $lock_fd; # the file itself is not needed, as long as it exists
+# }
+# else {
+# 	log_warn "Lock file '$lock_filename' cannot be created."
+# 		. " Will continue, but concurrent booking of resources may give strange results.";
+# }
 
 # ============================ Input processing ===================================
 
-log_trace "Process $$ connecting to the database";
+log_trace 'Connecting to the database';
 
 my $dbh = db_connect();
 if ( ! $dbh ) {
@@ -514,7 +521,7 @@ if ( ! db_upgrade ($dbh) ) {
 my $parser_tmp_dir = db_get_config ($dbh, 'parser_tmp_dir');
 $parser_tmp_dir = '/tmp' if is_empty ($parser_tmp_dir);
 
-log_trace "Process $$ processing standard input";
+log_trace 'Processing standard input';
 
 my $parser = new MIME::Parser;
 $parser->output_dir($parser_tmp_dir);
@@ -527,7 +534,7 @@ if ( ! $entity ) {
 	exit 4;
 }
 
-log_trace "Process $$: standard input processed";
+log_trace 'Standard input processed';
 
 my @parts = $entity->parts;
 
@@ -538,25 +545,25 @@ chomp $subject;
 my $reply_sender = '';
 my $response_type = '';
 
-log_info "Process $$: New message from '$sender' with subject '$subject'.";
+log_info "New message from '$sender' with subject '$subject'.";
 
 my $res = $dbh->selectall_hashref (db_stmt ($dbh, 
 	'select r_id, r_name, r_email, r_enabled from meqaris.meq_resources'), 'r_email');
 my $processed = 0;
 my %replied_attenddees = ();
 
-log_trace "Process $$: processing message parts.";
+log_trace 'Processing message parts.';
 
 for my $p (@parts) {
 
 	if ( $p->mime_type eq 'text/calendar'
 		|| $p->mime_type eq 'application/ics' ) {
 
-		log_info "Process $$: Message from '$sender' with subject '$subject' contains an iCalendar attachment.";
+		log_info "Message from '$sender' with subject '$subject' contains an iCalendar attachment.";
 
 		# bodyhandle() runs the decoding, as_string() doesn't
 		my $orig_invitation = $p->bodyhandle->as_string;
-		log_debug "Process $$: Message from '$sender' with subject '$subject' contains this iCalendar:\n" .
+		log_debug ": Message from '$sender' with subject '$subject' contains this iCalendar:\n" .
 			"-----\n$orig_invitation\n------";
 
 		my $ical = Data::ICal->new(data => $orig_invitation);
@@ -565,7 +572,7 @@ for my $p (@parts) {
 		my ($method) = prop_array($ical, 'METHOD');
 		if ( val($method) ne 'REQUEST' and val($method) ne 'CANCEL' ) {
 
-			log_warn "Process $$: Message from '$sender' with subject '$subject'" .
+			log_warn " Message from '$sender' with subject '$subject'" .
 				" contains an iCalendar, but its method '" .
 				val($method) . "' is unsupported. Skipping.";
 			next;
@@ -573,7 +580,7 @@ for my $p (@parts) {
 
 		my $calendar_reply = Data::ICal->new(rfc_strict => 1);
 		# Read the time zones, if any:
-		log_trace "Process $$: Processing iCalendar time zones.";
+		log_trace 'Processing iCalendar time zones.';
 		my (%vtz, @vevents);
 		for my $entry (@{$ical->entries}) {
 
@@ -588,7 +595,7 @@ for my $p (@parts) {
 				$vtz{$dtz->name} = $dtz;
 			}
 		}
-		log_trace "Process $$: Done processing iCalendar time zones. Processing events.";
+		log_trace 'Done processing iCalendar time zones. Processing events.';
 
 		my @response_details = ();
 		# Process events:
@@ -597,12 +604,12 @@ for my $p (@parts) {
 			Log::Log4perl::NDC->remove();
 			if ( ! defined ($event->property('uid')) ) {
 
-				log_warn "Process $$: Event contains no UID - ignoring.";
+				log_warn 'Event contains no UID - ignoring.';
 				next;
 			}
 			my ($uid) = prop_array($event, 'uid');
 			Log::Log4perl::NDC->push(val ($uid));
-			log_trace "Process $$: Got UID.";
+			log_trace 'Got UID.';
 
 			if ( ! defined ($event->property('attendee')) ) {
 
@@ -650,21 +657,31 @@ for my $p (@parts) {
 				# Get the timezone ID from the parameters:
 				my $tzid_start = $dtstart->parameters->{'TZID'};
 				# Convert the dates to the timezone:
-				my $dt_start = DateTime::Format::ICal->parse_datetime($dtstart->value);
+				my $dt_start_conv = DateTime::Format::ICal->parse_datetime(val($dtstart));
 
 				# The datetime is changed to be 'floating':
-				$dt_start->set_time_zone($vtz{$tzid_start})
+				$dt_start_conv->set_time_zone($vtz{$tzid_start})
 					if $tzid_start and $vtz{$tzid_start};
 
-				my $dt_end = undef;
+				my $dt_end_conv = undef;
 				my $dates = undef;
+				my $dtstamp_conv = undef;
 				if ( defined ($dtend) ) {
 
 					my $tzid_end = $dtend->parameters->{'TZID'};
 					# Convert the dates to the timezone:
-					$dt_end = DateTime::Format::ICal->parse_datetime($dtend->value);
+					$dt_end_conv = DateTime::Format::ICal->parse_datetime(val($dtend));
 					# The datetime is changed to be 'floating':
-					$dt_end->set_time_zone($vtz{$tzid_end})
+					$dt_end_conv->set_time_zone($vtz{$tzid_end})
+						if $tzid_end and $vtz{$tzid_end};
+				}
+				if ( defined ($dtstamp) ) {
+
+					my $tzid_end = $dtstamp->parameters->{'TZID'};
+					# Convert the dates to the timezone:
+					$dtstamp_conv = DateTime::Format::ICal->parse_datetime(val($dtstamp));
+					# The datetime is changed to be 'floating':
+					$dtstamp_conv->set_time_zone($vtz{$tzid_end})
 						if $tzid_end and $vtz{$tzid_end};
 				}
 				if ( defined ($rdates) || defined ($rrules) ) {
@@ -682,7 +699,7 @@ for my $p (@parts) {
 							$dates = $dates->union (
 								DateTime::Format::ICal->parse_recurrence (
 									recurrence => val ($rrule),
-									dtstart => $dt_start)
+									dtstart => $dt_start_conv)
 								);
 						}
 					}
@@ -706,7 +723,7 @@ for my $p (@parts) {
 							$dates = $dates->complement (
 								DateTime::Format::ICal->parse_recurrence (
 									recurrence => val ($exrule),
-									dtstart => $dt_start)
+									dtstart => $dt_start_conv)
 								);
 						}
 					}
@@ -762,10 +779,29 @@ for my $p (@parts) {
 					if ( $res->{$reply_sender}->{'r_enabled'} ) {
 
 						log_debug "Attendee '$reply_sender' is enabled - proceeding.";
+
+						# start transaction for the lock + check + DELETE + INSERT
+						$dbh->begin_work();
+						$updating = 1;
+						my $stmth = db_stmt ($dbh, 'lock table meqaris.meq_resource_reservations in access exclusive mode');
+						if ( ! $stmth ) {
+							log_warn "Database: cannot lock table.\n"
+								. " Will continue, but concurrent booking of resources may give strange results.\n"
+								. "Database error:\n"
+								. $dbh->errstr;
+						}
+						$stmth->execute();
+						if ( $dbh->errstr ) {
+							log_warn "Database: cannot lock table.\n"
+								. " Will continue, but concurrent booking of resources may give strange results.\n"
+								. "Database error:\n"
+								. $dbh->errstr;
+						}
 						# Attendee found and enabled. Check if this is an update.
-						my @values_find_del = (val ($uid), $reply_sender);
+						my @values_find_del = (val ($uid), $reply_sender, defined ($dtstamp_conv)? $dtstamp_conv : undef);
 						my @old_events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems not to work
-							db_stmt ($dbh, 'select rr_id, rr_r_id, rr_organiser, rr_seq, lower(rr_interval) as rr_dstart'
+							db_stmt ($dbh, 'select rr_id, rr_r_id, rr_organiser, coalesce (rr_seq, 0), lower(rr_interval) as rr_dstart,'
+								. ' rr_dtstamp, cast (coalesce ($3, \'19700101T010101Z\') as timestamp with time zone) as new_dtstamp'
 								. ' from meqaris.meq_resource_reservations'
 								. ' join meqaris.meq_resources on r_id = rr_r_id'
 								. ' where rr_uid = $1 and r_email = $2'),
@@ -773,26 +809,35 @@ for my $p (@parts) {
 						for my $old_event (@old_events) {
 
 							log_debug 'Event already exists - checking if this is an update.';
+
+							# an update can imply changing a resource, so do not check resource ID!
 							#if ( defined ($old_event->{'rr_r_id'})
 							#	&& $res->{$reply_sender}->{'r_id'} == $old_event->{'rr_r_id'} ) {
 
-								#log_trace 'Event has the same resource ID as the previous one.';
+								log_debug 'Old dtstamp=' . (defined ($old_event->{'rr_dtstamp'})?
+									$old_event->{'rr_dtstamp'} : 'null');
+								log_debug 'New dtstamp=' . (defined ($old_event->{'new_dtstamp'})?
+									$old_event->{'new_dtstamp'} : 'null');
+
+								# best to compare DB strings, otherwise e.g. '2022-05-19 17:31:52+02' vs. '20220519T153152Z'
+								if ( defined ($old_event->{'rr_dtstamp'})
+									&& defined ($old_event->{'new_dtstamp'})
+									&& $old_event->{'rr_dtstamp'} eq $old_event->{'new_dtstamp'} ) {
+
+									log_debug 'Same DTSTAMP - this is a duplicate, NOT an update.' .
+										' Can be an invitation sent to multiple resources. Skipping.';
+									next EV;
+								}
+
+								log_debug 'Old seq=' . (defined ($old_event->{'rr_seq'})? $old_event->{'rr_seq'} : 'null');
+								log_debug 'New seq=' . (defined ($sequence)? val ($sequence) : 'undef');
 								if ( defined ($old_event->{'rr_seq'})
 									&& defined ($sequence)
 									&& val ($sequence) eq $old_event->{'rr_seq'} ) {
 
-									log_debug 'Same sequence numbers - this is NOT an update.' .
+									log_debug 'Same sequence numbers - this is a duplicate, NOT an update.' .
 										' Can be an invitation sent to multiple resources. Skipping.';
-									next;
-								}
-
-								if ( defined ($old_event->{'rr_dstart'})
-									&& defined ($dtstart)
-									&& val ($dtstart) eq $old_event->{'rr_dstart'} ) {
-
-									log_debug 'Same DTSTART - this is NOT an update.' .
-										' Can be an invitation sent to multiple resources. Skipping.';
-									next;
+									next EV;
 								}
 							#}
 
@@ -808,6 +853,7 @@ for my $p (@parts) {
 							if ( $sender_mail ne $organizer_mail ) {
 
 								log_info "Sender '$sender_mail' is not iCalendar's organizer '$organizer_mail' - declining.";
+								$dbh->rollback if $updating;
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 								$calendar_reply->add_entry($event);
 								push @response_details, 'Declined for security reasons.';
@@ -827,6 +873,7 @@ for my $p (@parts) {
 
 								log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
 									$old_event->{'rr_organiser'} . "' - declining.";
+								$dbh->rollback if $updating;
 								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 								$calendar_reply->add_entry($event);
 								push @response_details, 'Declined for security reasons.';
@@ -841,9 +888,6 @@ for my $p (@parts) {
 								next AT;
 							}
 							log_debug "Sender '$sender_mail' is the same organizer as in the database.";
-							# start transaction for the DELETE + INSERT
-							$dbh->begin_work();
-							$updating = 1;
 							my $stmth = db_stmt ($dbh,
 								'delete from meqaris.meq_resource_reservations ' .
 								'where rr_id = $1');
@@ -857,7 +901,7 @@ for my $p (@parts) {
 									$calendar_reply->add_entry($event);
 									push @response_details, 'Unable to delete the event being updated.';
 									push @response_details, "The database error is:\n" . $dbh->errstr;
-									$dbh->rollback;
+									$dbh->rollback if $updating;
 									$processed = send_mail ($dbh, $calendar_reply,
 										$res->{$reply_sender}->{'r_name'} . " <$reply_sender>",
 										$sender, 'Declined', $subject,
@@ -878,7 +922,7 @@ for my $p (@parts) {
 								$calendar_reply->add_entry($event);
 								push @response_details, 'Unable to delete the event being updated.';
 								push @response_details, "The database error is:\n" . $dbh->errstr;
-								$dbh->rollback;
+								$dbh->rollback if $updating;
 								$processed = send_mail ($dbh, $calendar_reply,
 									$res->{$reply_sender}->{'r_name'} . " <$reply_sender>",
 									$sender, 'Declined', $subject,
@@ -890,7 +934,7 @@ for my $p (@parts) {
 						} # for my $old_event (@old_events)
 						# Try to insert the new event:
 						log_info 'Inserting new event';
-						my $stmth = undef;
+						$stmth = undef;
 						my @values_insert = undef;
 						if ( defined ($rdates) || defined ($rrules) ) {
 
@@ -904,7 +948,7 @@ for my $p (@parts) {
 							my $was_err = 0;
 							while ( my $dt = $iter->next ) {
 
-								if ( defined ($dt_end) ) {
+								if ( defined ($dt_end_conv) ) {
 
 									log_trace 'Recurring event - DTEND defined - inserting intervals.';
 
@@ -919,11 +963,11 @@ for my $p (@parts) {
 									@values_insert = (
 										$res->{$reply_sender}->{'r_id'},
 										$dt->stringify,
-										$dt_start,
-										$dt_end,
+										$dt_start_conv,
+										$dt_end_conv,
 										substr ($organizer_mail, 0, 1000),
 										substr (val ($summary), 0, 1000),
-										val ($dtstamp),
+										$dtstamp_conv,
 										substr (val ($uid), 0, 1000),
 										(defined ($sequence))? $sequence->value : 0,
 										encode_base64 ($orig_invitation)
@@ -945,7 +989,7 @@ for my $p (@parts) {
 										val ($duration),
 										substr ($organizer_mail, 0, 1000),
 										substr (val ($summary), 0, 1000),
-										val ($dtstamp),
+										$dtstamp_conv,
 										substr (val ($uid), 0, 1000),
 										(defined ($sequence))? $sequence->value : 0,
 										encode_base64 ($orig_invitation)
@@ -1016,7 +1060,7 @@ for my $p (@parts) {
 							# NOTE: recurring event inserted - do not proceed with the normal!
 							next AT;
 						}
-						elsif ( defined ($dt_end) ) {
+						elsif ( defined ($dt_end_conv) ) {
 
 							log_trace 'DTEND defined - inserting interval directly.';
 
@@ -1026,10 +1070,10 @@ for my $p (@parts) {
 								'values ($1, $2, $3, $4, $5, $6, $7, $8)');
 							@values_insert = (
 								$res->{$reply_sender}->{'r_id'},
-								"[$dt_start, $dt_end)",
+								"[$dt_start_conv, $dt_end_conv)",
 								substr ($organizer_mail, 0, 1000),
 								substr (val ($summary), 0, 1000),
-								val ($dtstamp),
+								$dtstamp_conv,
 								substr (val ($uid), 0, 1000),
 								(defined ($sequence))? $sequence->value : 0,
 								encode_base64 ($orig_invitation)
@@ -1046,11 +1090,11 @@ for my $p (@parts) {
 								'$4, $5, $6, $7, $8, $9)');
 							@values_insert = (
 								$res->{$reply_sender}->{'r_id'},
-								$dt_start,
+								$dt_start_conv,
 								val ($duration),
 								substr ($organizer_mail, 0, 1000),
 								substr (val ($summary), 0, 1000),
-								val ($dtstamp),
+								$dtstamp_conv,
 								substr (val ($uid), 0, 1000),
 								(defined ($sequence))? $sequence->value : 0,
 								encode_base64 ($orig_invitation)
@@ -1177,7 +1221,7 @@ for my $p (@parts) {
 				log_debug "Sender '$sender_mail' is iCalendar's organizer '$organizer_mail'.";
 				my @values_cancel = (val ($uid));
 				log_trace 'Searching the database for the event to cancel.';
-				my @events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref doesn't seem to work
+				my @events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems NOT to work
 					db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
 					{ Slice => {} }, @values_cancel) };
 				if (! defined ($events[0]{'rr_id'}) ) {
@@ -1221,7 +1265,7 @@ for my $p (@parts) {
 		} # event loop
 	} # $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics'
 	# Process just one invitation per each e-mail. Various mail clients
-	# may sen the same invitation using different MIME types, so reply
+	# may send the same invitation using different MIME types, so reply
 	# to just the first one successfully processed and stop processing
 	# to avoid conflicts and unnecessary meeting rejections.
 	last if $processed;
@@ -1229,7 +1273,7 @@ for my $p (@parts) {
 
 $dbh->disconnect;
 $parser->filer->purge;
-unlink $lock_filename;
+unlink $lock_filename if defined ($lock_filename);
 
 exit 0;
 
@@ -1513,7 +1557,7 @@ sub db_upgrade ($) {
 			log_warn "Database version $db_ver is newer than the expected version $meqaris_dbversion." .
 				' The application may behave improperly.' .
 				' You can continue or leave and install the correct application version.';
-			return 0;
+			return 1;
 		}
 	}
 	return 1;

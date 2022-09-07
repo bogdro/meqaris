@@ -22,7 +22,7 @@
 #
 
 NAME = meqaris
-VER = 1.0
+VER = 1.1
 
 RMDIR = /bin/rm -fr
 # when using '-p', no error is generated when the directory exists
@@ -31,11 +31,10 @@ COPY = /bin/cp -pRf
 CHMOD = /bin/chmod
 
 # Use the GNU tar format
-ifneq ($(shell tar --version | grep -i bsd),)
-PACK1 = /bin/tar --format gnutar -vcf
-else
-PACK1 = /bin/tar -vcf
-endif
+# ifneq ($(shell tar --version | grep -i bsd),)
+# PACK1_GNUOPTS = --format gnutar
+# endif
+PACK1 = /bin/tar $(PACK1_GNUOPTS) -vcf
 PACK1_EXT = .tar
 
 PACK2 = /usr/bin/gzip -9
@@ -48,12 +47,12 @@ all:	dist
 dist:	$(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT)
 
 $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT): AUTHORS ChangeLog COPYING NEWS \
-		README INSTALL-Meqaris.txt Makefile Meqaris-user-manual.txt \
+		README INSTALL-Meqaris.txt Makefile meqaris.spec \
 		meqaris.spec $(shell find $(SUBDIRS) -type f)
 	$(RMDIR) $(NAME)-$(VER)
 	$(MKDIR) $(NAME)-$(VER)
 	$(COPY) AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt NEWS \
-		README Makefile Meqaris-user-manual.txt meqaris.spec \
+		README Makefile meqaris.spec \
 		$(SUBDIRS) $(NAME)-$(VER)
 	$(PACK1) $(NAME)-$(VER)$(PACK1_EXT) $(NAME)-$(VER)
 	$(PACK2) $(NAME)-$(VER)$(PACK1_EXT)
@@ -64,8 +63,7 @@ install:
 	$(MKDIR) $(CONFDIR)
 	$(MKDIR) $(DOCDIR)/$(NAME)
 	$(MKDIR) $(DATADIR)/$(NAME)/sql
-	$(CHMOD) 755 $(BINDIR) $(CONFDIR) $(DATADIR)/$(NAME)/sql
-	$(CHMOD) 777 $(DATADIR)/$(NAME)
+	$(CHMOD) 755 $(BINDIR) $(CONFDIR) $(DATADIR)/$(NAME) $(DATADIR)/$(NAME)/sql
 	$(COPY) bin/meqaris $(BINDIR)
 	$(CHMOD) 755 $(BINDIR)/meqaris
 	$(COPY) sql/*.pgsql $(DATADIR)/$(NAME)/sql

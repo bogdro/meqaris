@@ -1,6 +1,6 @@
 # Special names here like {__make} come from /usr/lib/rpm/macros, /usr/lib/rpm/macros.rpmbuild
 
-%define meq_version 1.0
+%define meq_version 1.1
 %define meq_release 1
 %define meq_name meqaris
 %define meq_url https://meqaris.sourceforge.io
@@ -25,7 +25,7 @@ License:	%{meq_lic}
 Group:		Networking/Mail
 Source:		%{meq_name}-%{meq_version}.tar.gz
 #BuildRoot:	{_tmppath}/{meq_name}-build
-#Requires:	perl
+Requires:	perl(DBD::Pg)
 BuildArch:	noarch
 BuildRequires:	make
 
@@ -67,7 +67,8 @@ touch /var/log/meqaris.log
 %doc ChangeLog
 %doc INSTALL-Meqaris.txt
 %doc manual
-%attr(777,-,-) %dir /var/lib/meqaris
+# attr(777,-,-)
+%dir /var/lib/meqaris
 %dir /var/lib/meqaris/sql
 %attr(644,-,-) /var/lib/meqaris/sql/*
 %config(noreplace) %attr(644,-,-) /var/lib/meqaris/meqaris-log4perl.cfg

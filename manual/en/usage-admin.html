@@ -25,7 +25,7 @@
 <p>
 Meqaris is a command-line-driven application. You configure the system by
 issuing commands on the command-line and use the application by providing
-parameters and e-mail input on the command line and through the standard
+parameters on the command line and e-mail input through the standard
 input.
 </p>
 
@@ -41,7 +41,7 @@ configuration.
 </p>
 <p>
 To override the default configuration file path, use the <code>--conf</code> parameter,
-passing the full path to the configuration file:
+passing the path to the configuration file:
 </p>
 
 	<pre>	meqaris --conf /path/to/meqaris.ini</pre>
@@ -80,7 +80,7 @@ manually by running the
 	<pre>	meqaris --upgrade-db</pre>
 
 <p>
-command and check the status afterwards.
+command and checking the status afterwards.
 </p>
 <p>
 To begin booking meeting resources, you need to create those resources in the
@@ -114,11 +114,6 @@ Once resources are added, you can start booking them - just send your
 invitations with the resources' configured e-mail addresses just like you
 would send invitations to other meeting participants.
 See the <a href="usage-mua.html" hreflang="en">User's manual</a> on how to do that.
-</p>
-<p>
-Warning: you can put more than one Meqaris resource in the same invitation,
-but you may receive multiple replies in that case (even declining). The resources get properly
-booked, though.
 </p>
 <p>
 To later modify the resource, if needed, use the <code>--update</code> parameter, passing

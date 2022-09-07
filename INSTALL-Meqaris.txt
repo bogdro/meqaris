@@ -100,8 +100,7 @@ Application installation
 
 - Copy the the whole 'sql' directory and the config/meqaris-log4perl.cfg file
   to a directory expected to contain application data files, like
-  /var/lib/meqaris/. The 'DATADIR/meqaris' directory must be writeable for
-  your mail server.
+  /var/lib/meqaris/.
 
 - Copy config/meqaris.ini to a directory expected to contain configuration
   files, like /etc

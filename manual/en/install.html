@@ -35,6 +35,7 @@
    <li>DBD::Pg,</li>
    <li>DBI,</li>
    <li>Getopt::Long,</li>
+   <li>Log::Log4perl,</li>
    <li>MIME::Base64,</li>
    <li>MIME::Parser,</li>
   </ul>
@@ -46,7 +47,7 @@
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
   </p>
   <p>
-  The Log::Log4perl module is optional, but can be of great help with logging
+  The Log::Log4perl module should be optional, but can be of great help with logging
   when problems occur.
   </p>
   <p>
@@ -145,8 +146,7 @@
 
  <li>Edit <code>config/meqaris-log4perl.cfg</code> and choose your log file's location</li>
 
- <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR</code>.
-  The <code>DATADIR/meqaris</code> directory must be writeable for your mail server.</li>
+ <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR</code>.</li>
 
  <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code></li>
 
