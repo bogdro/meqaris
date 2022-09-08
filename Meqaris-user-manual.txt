@@ -81,10 +81,6 @@ Once resources are added, you can start booking them - just send your
  invitations with the resources' configured e-mail addresses just like you
  would send invitations to other meeting participants.
 
-Warning: you can put more than one Meqaris resource in the same invitation,
- but you may receive multiple replies in that case. The resources get properly
- booked, though.
-
 To later modify the resource, if needed, use the --update parameter, passing
  the name of the resource to modify and the new parameters:
 

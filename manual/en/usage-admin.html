@@ -236,6 +236,10 @@ The <code>datadir</code> parameter in the <code>[meqaris]</code> section tells w
 data files (SQL files) are.
 </p>
 <p>
+The <code>log4perl_config_location</code> parameter in the <code>[meqaris]</code> section gives the
+location of the configuration file for Log::Log4perl.
+</p>
+<p>
 The <code>lock_dir</code> parameter in the <code>[meqaris]</code> section gives the
 location of the directory to put lock files in. Lock files prevent two or more
 Meqaris processes from accessing crucial code at the same time, to avoid e.g.
@@ -243,10 +247,6 @@ running two database upgrades at the same time (one of which is bound to fail).
 <br>
 The directory must be writeable by your mail server's user (and its parent directories
 must be traversable by your mail server's user).
-</p>
-<p>
-The <code>log4perl_config_location</code> parameter in the <code>[meqaris]</code> section gives the
-location of the configuration file for Log::Log4perl.
 </p>
 <p>
 The <code>username</code> parameter in the <code>[postgresql]</code> section gives the database
