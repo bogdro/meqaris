@@ -9,12 +9,13 @@ name: CxFlow
 
 on:
   push:
-    branches: [ "master", dev, main ]
-  pull_request:
+    #branches: [ "master", dev, main ]
+    branches: [ x ]
+  #pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ "master" ]
-  schedule:
-    - cron: '42 11 1 * *'
+  #  branches: [ "master" ]
+  #schedule:
+  #  - cron: '42 11 1 * *'
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel - this job is specifically configured to use the Checkmarx CxFlow Action
 permissions:
