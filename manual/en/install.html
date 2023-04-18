@@ -260,6 +260,16 @@ default paths, the most complicated entry in the <code>/etc/postfix/aliases</cod
 <pre>
 	room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"</pre>
 <p>
+By using just the <code>cat</code> command as the output instead of sending e-mails
+(see the <a href="usage-admin.html" hreflang="en">Manual for administrators</a>),
+you can pipe the reply from Meqaris to other commands, including the mail
+server's own commands and since you know e.g. the alias which is being
+processed, you can add it to the other command's options, like so:
+</p>
+<pre>
+room1: |"meqaris"| some-other-command "room1"</pre>
+
+<p>
 For a password-less, local-only mail submission, add this to your
 <code>/etc/postfix/main.cf</code> file:
 </p>

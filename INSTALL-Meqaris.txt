@@ -184,6 +184,14 @@ Assuming you want a "room 1" alias and everything is installed NOT in the
 
 room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"
 
+By using just the `cat` command as the output instead of sending e-mails
+(see the Manual for administrators), you can pipe the reply from Meqaris
+to other commands, including the mail server's own commands and since you
+know e.g. the alias which is being processed, you can add it to the other
+command's options, like so:
+
+room1: |"meqaris"| some-other-command "room1"
+
 For a passwordless, local-only mail submission, add this to your
  /etc/postfix/main.cf file:
 
