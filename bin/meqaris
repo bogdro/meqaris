@@ -1657,7 +1657,9 @@ sub db_upgrade ($) {
 				$dbh->rollback();
 				$ret = 0;
 			}
-			$dbh->commit();
+			else {
+				$dbh->commit();
+			}
 		}
 		elsif ($db_ver < $meqaris_dbversion) {
 
