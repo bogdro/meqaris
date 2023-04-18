@@ -23,3 +23,5 @@
 
 createdb -O meqaris meqaris
 #createlang plpgsql meqaris
+psql -U postgres -h localhost -p 5678 -d meqaris \
+	-c 'create extension if not exists btree_gist;'
