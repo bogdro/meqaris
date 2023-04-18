@@ -60,7 +60,7 @@
 	On a Linux system, you would do one of:
 	<ul>
 	 <li>login to the system as the database user <code>postgres</code> (you can
-		do <code>su - postgres</code> as <code>root</code> to login to that account on Linux) and run:
+		do <code>su - postgres</code> as <code>root</code> to log in to that account on Linux) and run:
 	  <pre>	pg_ctl start</pre>
 	  </li>
 	 <li>login as <code>root</code> and run:
@@ -105,7 +105,7 @@
 	psql -U postgres -h hostname -p port_number -d meqaris -c 'create extension if not exists btree_gist;'</pre>
 	</li>
 
- <li>Database access rules must be created within the database server unless you wish to leave the default rules.<br>
+ <li>Database access rules must be created within the database server, unless you wish to leave the default rules.<br>
 	With PostgreSQL, you would do (as the database user <code>postgres</code> or <code>root</code>):
 	<pre>
 	cp /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf-backup
@@ -155,20 +155,21 @@
    	The manual page will be installed in <code>MANDIR/man1</code>.</li>
   </ul></li>
 
- <li>Copy <code>bin/meqaris</code> to <code>BINDIR</code></li>
+ <li>Copy <code>bin/meqaris</code> to <code>BINDIR</code>,</li>
 
- <li>Edit <code>config/meqaris.ini</code> to match your directories and database settings (see below)</li>
+ <li>Edit <code>config/meqaris.ini</code> to match your directories and database settings (see below),</li>
 
- <li>Edit <code>config/meqaris-log4perl.cfg</code> and choose your log file's location</li>
+ <li>Edit <code>config/meqaris-log4perl.cfg</code> and choose your log file's location,</li>
 
- <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR</code>.</li>
+ <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR/meqaris</code>.
+	The <code>DATADIR/meqaris</code> directory must be writable for your mail server,</li>
 
- <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code></li>
+ <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code>,</li>
 
  <li>Copy <code>config/meqaris.logrotate</code> to a directory expected to contain logrotate
-  configuration files (like <code>CONFDIR/logrotate.d</code>)</li>
+  configuration files (like <code>CONFDIR/logrotate.d</code>),</li>
 
- <li>Copy the manual to a place suitable for documentation, like <code>/usr/share/doc</code></li>
+ <li>Copy the manual to a place suitable for documentation, like <code>/usr/share/doc</code>.</li>
 
 </ol>
 
@@ -188,7 +189,7 @@ All the above directories and their parent directories must be reachable by
 your mail server.
 </p>
 <p>
-The log file (<code>/var/log/meqaris.log</code> by default) must be created writeable for
+The log file (<code>/var/log/meqaris.log</code> by default) must be created writable for
 your mail server. Alternatively, the directory which would contain it must be
 writeable by your mail server.
 </p>
@@ -227,7 +228,7 @@ directory in the <code>[meqaris]</code> section under:
 
 <p>
 Make sure that the <code>datadir</code> directory, the <code>log4perl_config_location</code> file
-and the actual log file have the right permission so that Meqaris, which
+and the actual log file have the right permissions so that Meqaris, which
 will run under the mail server's privileges, has the right access to all of
 those locations.
 </p>
@@ -244,7 +245,7 @@ replies.
 </p>
 <p>
 For Postfix, you can edit the <code>/etc/postfix/aliases</code> file and add the right
-command there. It must being with the "pipe" symbol - "|" - so that the
+command there. It must begin with the "pipe" symbol - "|" - so that the
 Meqaris script receives the mail on the so-called "standard input".
 </p>
 <p>
@@ -318,7 +319,7 @@ Restart the Postfix server (or reload its configuration) afterwards.
 
 <p>
 Alternatively, if you have the 'make' program and some common Linux
- utilities, you can run 'make uninstall', passing the the same directories
+ utilities, you can run 'make uninstall', passing the same directories
  that were used during installation.
  Examples:
 </p>

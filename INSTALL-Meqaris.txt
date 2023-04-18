@@ -24,7 +24,7 @@ Initial steps - most are one-time
   On a Linux system, you would do one of:
 
   * login to the system as the database user 'postgres' (you usually do
-    'su - postgres' as 'root' to login to that account) and run:
+    'su - postgres' as 'root' to log in to that account) and run:
 
 	pg_ctl start
 
@@ -56,7 +56,7 @@ Initial steps - most are one-time
 	psql -U postgres -h hostname -p port_number -d meqaris \
 		-c 'create extension if not exists btree_gist;'
 
-- Database access rules must be created within the database server unless you
+- Database access rules must be created within the database server, unless you
   wish to leave the default rules.
   Login to the system as the database user 'postgres' or 'root' and run:
 
@@ -95,24 +95,24 @@ Initial steps - most are one-time
 Application installation
 ------------------------
 
-- Copy bin/meqaris to a directory expected to contain binaries, like /usr/bin
+- Copy bin/meqaris to a directory expected to contain binaries, like /usr/bin,
 
 - Edit config/meqaris.ini to match your directories and database settings
-  (see below)
+  (see below),
 
-- Edit config/meqaris-log4perl.cfg and choose your log file's location
+- Edit config/meqaris-log4perl.cfg and choose your log file's location,
 
 - Copy the the whole 'sql' directory and the config/meqaris-log4perl.cfg file
   to a directory expected to contain application data files, like
-  /var/lib/meqaris/.
+  /var/lib/meqaris/. The directory must be writable for your mail server,
 
 - Copy config/meqaris.ini to a directory expected to contain configuration
-  files, like /etc
+  files, like /etc,
 
 - Copy config/meqaris.logrotate to a directory expected to contain logrotate
-  configuration files, like /etc/logrotate.d
+  configuration files, like /etc/logrotate.d,
 
-- Copy the manual to a place suitable for documentation, like /usr/share/doc
+- Copy the manual to a place suitable for documentation, like /usr/share/doc.
 
 Alternatively, if you have the 'make' program and some common Linux
  utilities, you can run 'make install', passing the the target directories.
@@ -128,6 +128,10 @@ Alternatively, if you have the 'make' program and some common Linux
 
 All the above directories and their parent directories must be reachable by
  your mail server.
+
+The log file (/var/log/meqaris.log by default) must be created writable for
+ your mail server. Alternatively, the directory which would contain it must be
+ writable by your mail server.
 
 The necessary database structures will be created by the application itself
  while operating. You can also choose to run the database installation/upgrade
@@ -158,7 +162,7 @@ port=5432
 connect_timeout=30
 
 Make sure that the "datadir" directory, the "log4perl_config_location" file
- and the actual log file have the right permission so that Meqaris, which
+ and the actual log file have the right permissions so that Meqaris, which
  will run under the mail server's privileges, has the right access to all of
  those locations.
 
@@ -171,7 +175,7 @@ Consult your mail server manual about how to make it send e-mails addressed
  replies.
 
 For Postfix, you can edit the /etc/postfix/aliases file and add the right
- command there. It must being with the "pipe" symbol - "|" - so that the
+ command there. It must begin with the "pipe" symbol - "|" - so that the
  Meqaris script receives the mail on the so-called "standard input".
 
 Assuming you want a "room 1" alias and everything is installed in the default
@@ -185,10 +189,10 @@ Assuming you want a "room 1" alias and everything is installed NOT in the
 room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"
 
 By using just the `cat` command as the output instead of sending e-mails
-(see the Manual for administrators), you can pipe the reply from Meqaris
-to other commands, including the mail server's own commands and since you
-know e.g. the alias which is being processed, you can add it to the other
-command's options, like so:
+ (see the Manual for administrators), you can pipe the reply from Meqaris
+ to other commands, including the mail server's own commands and since you
+ know e.g. the alias which is being processed, you can add it to the other
+ command's options, like so:
 
 room1: |"meqaris"| some-other-command "room1"
 
@@ -235,7 +239,7 @@ To uninstall, if needed:
 	dropuser meqaris
 
 Alternatively, if you have the 'make' program and some common Linux
- utilities, you can run 'make uninstall', passing the the same directories
+ utilities, you can run 'make uninstall', passing the same directories
  that were used during installation.
  Examples:
 
