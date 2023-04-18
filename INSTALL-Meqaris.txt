@@ -45,13 +45,6 @@ Initial steps - most are one-time
 
 	createdb -O meqaris meqaris
 
-- A procedural language suitable for the database must be installed in the
-  logical database.
-  Login to the system as the database user 'postgres' and run:
-
-	createlang plpgsql meqaris
-	(don't worry if it says that the language already exists).
-
 - NOTE for older database versions:
   On PostgreSQL versions older than 13.0, you may need to perform one
   additional step before running Meqaris - install the "btree_gist" extension
