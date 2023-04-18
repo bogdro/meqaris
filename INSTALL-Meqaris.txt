@@ -245,10 +245,3 @@ Alternatively, if you have the 'make' program and some common Linux
 		DATADIR=$HOME/tools/meqaris/data \
 		DOCDIR=$HOME/tools/meqaris/doc \
 		MANDIR=$HOME/tools/meqaris/man
-
------------------------------------------------------------------
-
-Project home page
------------------
-
-https://meqaris.sourceforge.io/
