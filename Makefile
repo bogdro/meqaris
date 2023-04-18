@@ -40,7 +40,8 @@ PACK1_EXT = .tar
 PACK2 = /usr/bin/gzip -9
 PACK2_EXT = .gz
 
-POD2MAN = pod2man
+POD2MAN = /usr/bin/pod2man
+POD2CHK = /usr/bin/podchecker
 
 SUBDIRS = bin config manual scripts sql
 
@@ -97,6 +98,7 @@ install:
 	$(CHMOD) 644 $(DATADIR)/$(NAME)/$(NAME)-log4perl.cfg
 	$(COPY) manual AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt \
 		README $(DOCDIR)/$(NAME)/
+	$(POD2CHK) $(NAME).pod
 	$(POD2MAN) $(NAME).pod $(MANDIR)/man1/$(NAME).1
 	#$(PACK2) $(MANDIR)/man1/$(NAME).1
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/en/*.*
