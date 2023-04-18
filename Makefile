@@ -76,6 +76,7 @@ $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT): $(EXTRA_DIST) \
 	$(RMDIR) $(NAME)-$(VER)
 	$(MKDIR) $(NAME)-$(VER)
 	$(COPY) $(EXTRA_DIST) $(SUBDIRS) $(NAME)-$(VER)
+	$(RMDIR) $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT)
 	$(PACK1) $(NAME)-$(VER)$(PACK1_EXT) $(NAME)-$(VER)
 	$(PACK2) $(NAME)-$(VER)$(PACK1_EXT)
 	$(RMDIR) $(NAME)-$(VER)
@@ -102,6 +103,7 @@ install:
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/en/rsrc/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/rsrc/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/rsrc/css/*.*
+	$(CHMOD) 755 $(DOCDIR)/$(NAME)
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/en
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/en/rsrc
