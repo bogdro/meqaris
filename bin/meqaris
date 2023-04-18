@@ -1613,8 +1613,8 @@ sub db_run_file ($$) {
 	my $dbh = shift;
 	my $filename = shift;
 
-	open (my $f, '<', $filename);
-	if ( ! defined ($f) ) {
+	my $f = undef;
+	if ( ! open ($f, '<', $filename) ) {
 
 		log_fatal "Database upgrade: cannot open file '$filename': $!";
 		print "Database upgrade: cannot open file '$filename': $!". "\n";
