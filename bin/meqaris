@@ -1555,6 +1555,10 @@ sub is_empty ($) {
 sub db_connect {
 
 	my $dbtype = $inicfg{'meqaris.dbtype'};
+	if ( ! defined($dbtype) ) {
+		log_fatal 'Database: cannot connect: missing "dbtype" parameter';
+		return undef;
+	}
 	my $conn_timeout = 30;
 	$conn_timeout = $inicfg{"$dbtype.connect_timeout"} unless is_empty ($inicfg{"$dbtype.connect_timeout"});
 
