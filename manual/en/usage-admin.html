@@ -262,7 +262,9 @@ database to connect to.
 </p>
 <p>
 The <code>host</code> parameter in the <code>[postgresql]</code> section gives the hostname or an
-IP address of the database to connect to.
+IP address of the database to connect to. It can also be the path to the directory containing the local
+PostgreSQL socket for local connections, e.g. <code>/run/postgresql/</code> in some versions,
+<code>/tmp</code> in other.
 </p>
 <p>
 The <code>port</code> parameter in the <code>[postgresql]</code> section gives the port number of
