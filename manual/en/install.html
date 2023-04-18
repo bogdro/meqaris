@@ -95,6 +95,16 @@
 	(for the specified user to be the database owner)
 	</li>
 
+ <li><em class="important">NOTE for older database versions</em><br>
+	On PostgreSQL versions older than 13.0, you may need to perform one additional step before
+	running Meqaris - install the <code>btree_gist</code> extension manually in the Meqaris database you've
+	just created. Meqaris cannot do this, because only the database superuser (usually
+	<code>postgres</code>) is allowed to do it.
+	Substitute the hostname and port number where necessary and run this command to install the extension:
+	<pre>
+	psql -U postgres -h hostname -p port_number -d meqaris -c 'create extension if not exists btree_gist;'</pre>
+	</li>
+
  <li>Database access rules must be created within the database server unless you wish to leave the default rules.<br>
 	With PostgreSQL, you would do (as the database user <code>postgres</code> or <code>root</code>):
 	<pre>
