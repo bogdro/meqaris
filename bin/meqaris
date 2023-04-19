@@ -73,9 +73,11 @@ sub clean_name ($);
 sub prop_array ($$);
 sub is_empty ($);
 sub db_stmt ($$);
+sub db_stmt_print ($$);
 sub db_version ($);
 sub db_run_file ($$);
 sub db_upgrade ($);
+sub db_upgrade_print ($);
 sub dbunlock();
 sub dblock();
 
@@ -294,13 +296,11 @@ if ( $create ) {
 
 	log_info "Command line: --create: name='$create' email='$email' desc='$description'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
-	exit 2 unless $stmth;
-	$create = clean_name($create);
-	my $rowcount = $stmth->execute(substr ($create, 0, 1000),
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
+	$create = clean_name ($create);
+	my $rowcount = $stmth->execute (substr ($create, 0, 1000),
 		substr ($email, 0, 1000), substr ($description, 0, 1000));
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot create resource: ' . $dbh->errstr;
@@ -322,13 +322,11 @@ if ( $delete ) {
 
 	log_info "Command line: --delete: name='$delete'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'delete from meqaris.meq_resources where r_name = $1');
-	exit 2 unless $stmth;
-	$delete = clean_name($delete);
-	my $rowcount = $stmth->execute($delete);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'delete from meqaris.meq_resources where r_name = $1');
+	$delete = clean_name ($delete);
+	my $rowcount = $stmth->execute ($delete);
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot delete resource: ' . $dbh->errstr;
 		print 'Database: cannot delete resource: ' . $dbh->errstr . "\n";
@@ -349,10 +347,8 @@ if ( $destroy_db ) {
 
 	log_warn 'Command line: --destroy-db';
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	my $stmth = db_stmt ($dbh, 'drop schema meqaris cascade');
-	exit 2 unless $stmth;
+	my $dbh = db_connect_print();
+	my $stmth = db_stmt_print ($dbh, 'drop schema meqaris cascade');
 	$stmth->execute();
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot destroy the database schema: ' . $dbh->errstr;
@@ -369,13 +365,11 @@ if ( $disable ) {
 
 	log_info "Command line: --disable: name='$disable'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'update meqaris.meq_resources set r_enabled = false where r_name = $1');
-	exit 2 unless $stmth;
-	$disable = clean_name($disable);
-	my $rowcount = $stmth->execute($disable);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_resources set r_enabled = false where r_name = $1');
+	$disable = clean_name ($disable);
+	my $rowcount = $stmth->execute ($disable);
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot disable resource: ' . $dbh->errstr;
 		print 'Database: cannot disable resource: ' . $dbh->errstr . "\n";
@@ -396,13 +390,11 @@ if ( $enable ) {
 
 	log_info "Command line: --enable: name='$enable'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'update meqaris.meq_resources set r_enabled = true where r_name = $1');
-	exit 2 unless $stmth;
-	$enable = clean_name($enable);
-	my $rowcount = $stmth->execute($enable);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_resources set r_enabled = true where r_name = $1');
+	$enable = clean_name ($enable);
+	my $rowcount = $stmth->execute ($enable);
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot enable resource: ' . $dbh->errstr;
 		print 'Database: cannot enable resource: ' . $dbh->errstr . "\n";
@@ -429,9 +421,8 @@ if ( $update ) {
 		exit 1;
 	}
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
 	my $sql = 'update meqaris.meq_resources set ';
 	my $first = 1;
 	my $par_cnt = 2;
@@ -467,9 +458,8 @@ if ( $update ) {
 
 	$sql .= ' where r_name = $1';
 
-	my $stmth = db_stmt ($dbh, $sql);
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute(@values);
+	my $stmth = db_stmt_print ($dbh, $sql);
+	my $rowcount = $stmth->execute (@values);
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot update resource: ' . $dbh->errstr;
 		print 'Database: cannot update resource: ' . $dbh->errstr . "\n";
@@ -494,12 +484,10 @@ if ( $set ) {
 		log_debug 'Attempting to modify a forbidden parameter';
 		exit 1;
 	}
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute($set, $value);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
+	my $rowcount = $stmth->execute ($set, $value);
 	if ( $dbh->errstr ) {
 		log_error 'Database: cannot modify setting: ' . $dbh->errstr;
 		print 'Database: cannot modify setting: ' . $dbh->errstr . "\n";
@@ -520,9 +508,8 @@ if ( $upgrade_db ) {
 
 	log_info 'Command line: --upgrade-db';
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
 	$dbh->disconnect;
 	log_info 'Database upgraded successfully.';
 	print "Database upgraded successfully.\n";
@@ -1591,6 +1578,17 @@ sub db_connect {
 	return $dbh;
 }
 
+sub db_connect_print {
+
+	my $dbh = db_connect();
+	if ( ! $dbh ) {
+
+		print 'Database: cannot connect: ' . $DBI::errstr . "\n";
+		exit 2;
+	}
+	return $dbh;
+}
+
 # ============================ db_stmt ===================================
 
 sub db_stmt ($$) {
@@ -1600,6 +1598,19 @@ sub db_stmt ($$) {
 	my $stmth = $dbh->prepare ($sql);
 	if ( ! $stmth ) {
 		log_fatal 'Database: cannot create statement: ' . $dbh->errstr;
+	}
+	return $stmth;
+}
+
+sub db_stmt_print ($$) {
+
+	my $dbh = shift;
+	my $sql = shift;
+	my $stmth = db_stmt($dbh, $sql);
+	if ( ! $stmth ) {
+
+		print "Database: cannot create statement. See the logs.\n";
+		exit 2;
 	}
 	return $stmth;
 }
@@ -1703,6 +1714,18 @@ sub db_upgrade ($) {
 	}
 	dbunlock();
 	return $ret;
+}
+
+sub db_upgrade_print ($) {
+
+	my $dbh = shift;
+	my $res = db_upgrade($dbh);
+	if ( ! $res ) {
+
+		print "Database: cannot upgrade. See the logs.\n";
+		exit 3;
+	}
+	return $res;
 }
 
 # ============================ Locking ===================================
