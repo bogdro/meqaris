@@ -761,18 +761,23 @@ for my $p (@parts) {
 
 								# not a period - parse a date
 								my $rdate_tzid = $rdate->parameters->{'TZID'};
-								my $rdate_parsed = DateTime::Format::ICal->parse_datetime($rdate_val);
 
-								$rdate_parsed->set_time_zone($vtz{$rdate_tzid})
-									if $rdate_tzid and $vtz{$rdate_tzid};
-								$dates = $dates->union (
-									DateTime::Set->from_datetimes(
-										dates => [$rdate_parsed]
-									)
-								);
+								for my $rdate_part (split /,/o, $rdate_val) {
+
+									my $rdate_parsed = DateTime::Format::ICal->parse_datetime($rdate_part);
+									$rdate_parsed->set_time_zone($vtz{$rdate_tzid})
+										if $rdate_tzid and $vtz{$rdate_tzid};
+									$dates = $dates->union (
+										DateTime::Set->from_datetimes(
+											dates => [$rdate_parsed]
+										)
+									);
+								}
 							}
 							else {
-								push @rdates_periods, DateTime::Format::ICal->parse_period ($rdate_val);
+								for my $rdate_part (split /,/o, $rdate_val) {
+									push @rdates_periods, DateTime::Format::ICal->parse_period ($rdate_part);
+								}
 							}
 						}
 					}
@@ -792,16 +797,23 @@ for my $p (@parts) {
 
 					if ( defined ($exdates) ) {
 						for my $exdate ($exdates) {
-							my $exdate_tzid = $exdate->parameters->{'TZID'};
-							my $exdate_parsed = DateTime::Format::ICal->parse_datetime(val ($exdate));
+							my $exdate_val = val ($exdate);
+							next unless $exdate_val;
+							log_trace "Processing EXDATE - date: '$exdate_val'.";
 
-							$exdate_parsed->set_time_zone($vtz{$exdate_tzid})
-								if $exdate_tzid and $vtz{$exdate_tzid};
-							$dates = $dates->complement (
-								DateTime::Set->from_datetimes(
-									dates => [$exdate_parsed]
-								)
-							);
+							my $exdate_tzid = $exdate->parameters->{'TZID'};
+							for my $exdate_part (split /,/o, $exdate_val) {
+
+								my $exdate_parsed = DateTime::Format::ICal->parse_datetime($exdate_part);
+
+								$exdate_parsed->set_time_zone($vtz{$exdate_tzid})
+									if $exdate_tzid and $vtz{$exdate_tzid};
+								$dates = $dates->complement (
+									DateTime::Set->from_datetimes(
+										dates => [$exdate_parsed]
+									)
+								);
+							}
 						}
 					}
 				}
