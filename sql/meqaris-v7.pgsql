@@ -28,7 +28,7 @@ Required for indices, triggers and their comments.
 set schema 'meqaris';
 
 alter table meqaris.meq_resources add constraint r_email_syntax
-check (r_email ~* '^[a-z0-9_][a-z0-9_.\-]+@[a-z0-9_.\-]+$');
+check (r_email ~* '^[a-z0-9_][a-z0-9_.\-]*@[a-z0-9_.\-]+$');
 
 update meqaris.meq_config set c_value = '7'
 where c_name = 'db_version';
