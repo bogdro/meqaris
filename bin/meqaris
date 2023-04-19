@@ -1377,7 +1377,16 @@ for my $p (@parts) {
 					$sql .= ' and lower(rr_interval) = $2';
 					push @values_cancel, val ($recurr_id);
 				}
-				if ( defined ($event->property('attendee')) ) {
+				my $event_status = '';
+				if ( defined ($event->property('STATUS')) ) {
+
+					my @ev_status = prop_array($event, 'STATUS');
+					$event_status = val ($ev_status[0]);
+					log_trace "STATUS = '$event_status'.";
+				}
+				if ( defined ($event->property('attendee'))
+					# CANCELLED status means to cancel all
+					&& !(defined ($event_status) && $event_status eq 'CANCELLED')) {
 
 					log_trace 'Deleting just for the specified attendees.';
 					my @attendees = @{$event->property('attendee')};
