@@ -49,7 +49,9 @@ create table meqaris.meq_resources
 (
 	r_id serial constraint res_pk primary key,
 	r_name varchar(1000) not null,
-	r_email varchar(1000) not null constraint r_email_unique unique,
+	r_email varchar(1000) not null
+		constraint r_email_unique unique
+		constraint r_email_syntax check (r_email ~* '^[a-z0-9_][a-z0-9_.\-]+@[a-z0-9_.\-]+$'),
 	r_description varchar(1000),
 	r_enabled bool not null default true
 );
