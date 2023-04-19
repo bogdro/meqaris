@@ -1646,10 +1646,10 @@ sub db_run_file ($$) {
 		print "Database upgrade: cannot open file '$filename': $!". "\n";
 		return 0;
 	}
-	my @lines = <$f>;
+	my $file_contents = join("\n", <$f>);
 	close $f;
 
-	my $stmth = db_stmt ($dbh, join ("\n", @lines));
+	my $stmth = db_stmt ($dbh, $file_contents);
 	return 0 unless $stmth;
 	$stmth->execute();
 	if ( $dbh->errstr ) {
