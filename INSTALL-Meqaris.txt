@@ -181,12 +181,12 @@ For Postfix, you can edit the /etc/postfix/aliases file and add the right
 Assuming you want a "room 1" alias and everything is installed in the default
  paths, the simplest entry in the 'aliases' file could be:
 
-room1: |"meqaris"
+	room1: |"meqaris"
 
 Assuming you want a "room 1" alias and everything is installed NOT in the
  default paths, the most complicated entry in the 'aliases' file could be:
 
-room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"
+	room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"
 
 By using just the `cat` command as the output instead of sending e-mails
  (see the Manual for administrators), you can pipe the reply from Meqaris
@@ -194,7 +194,26 @@ By using just the `cat` command as the output instead of sending e-mails
  know e.g. the alias which is being processed, you can add it to the other
  command's options, like so:
 
-room1: |"meqaris"| some-other-command "room1"
+	room1: |"meqaris"| some-other-command "room1"
+
+Meqaris will substitute the following strings in the command you set in the
+ 'mail_command' parameter:
+
+- %from% gets substituted by the value of the "From" header in the response
+  (which is the resource's name and e-mail address),
+- %to% gets substituted by the value of the "To" header in the response
+  (which usually is the meeting Organizer),
+- %cc% gets substituted by the value of the "Cc" header in the response
+  (which usually is the address of the sender of the invitation, which can
+  be different than the Organizer),
+- %subject% gets substituted by the subject of the response e-mail,
+- %action% gets substituted by the action Meqaris took - 'Accepted'
+  or 'Declined'.
+
+This way, you can pipe your responses to another mailing mechanism, e.g.:
+
+	meqaris --set mail_command --value 'some_mail_program --from "%from%" --to "%to%"'
+	meqaris --set mail_sending_method --value mail_command
 
 For a passwordless, local-only mail submission, add this to your
  /etc/postfix/main.cf file:

@@ -328,7 +328,9 @@ Currently, the following user-modifiable parameters are supported:
 
  <li><code>mail_command</code>: The command to pipe the outgoing mail replies into
   instead of sending the replies using a mail server. The default value is
-  <code>NULL</code>.<br> To gather replies in a file (on Linux), use something like
+  <code>NULL</code>, which silently drops the responses.<br>
+  <em class="important">The setting is used only when <code>mail_sending_method = "mail_command"</code></em>.<br>
+  To gather replies in a file (on Linux), use something like
 
   	<pre>	cat >> /path/to/your_file</pre>
 
@@ -338,8 +340,25 @@ Currently, the following user-modifiable parameters are supported:
 
   	<pre>	cat</pre>
 
-  The setting is used only when <code>mail_sending_method = "mail_command"</code>.
-  <br><br></li>
+  Meqaris will substitute the following strings in the command you set in the
+   <code>mail_command</code> parameter:
+  <ul>
+   <li><code>%from%</code> gets substituted by the value of the <code>From</code> header in the response
+    (which is the resource's name and e-mail address),
+   <li><code>%to%</code> gets substituted by the value of the <code>To</code> header in the response
+    (which usually is the meeting Organizer),
+   <li><code>%cc%</code> gets substituted by the value of the <code>Cc</code> header in the response
+    (which usually is the address of the sender of the invitation, which can
+    be different than the Organizer),
+   <li><code>%subject%</code> gets substituted by the subject of the response e-mail,
+   <li><code>%action%</code> gets substituted by the action Meqaris took - <code>Accepted</code>
+    or <code>Declined</code>.
+  </ul>
+  This way, you can pipe your responses to another mailing mechanism, e.g.:
+  <pre>
+	meqaris --set mail_command --value 'some_mail_program --from "%from%" --to "%to%"'
+	meqaris --set mail_sending_method --value mail_command</pre>
+  </li>
 
  <li><code>parser_tmp_dir</code>: The path to a temporary directory for files with
   message parts. Default = <code>/tmp</code>. <code>NULL</code> means use the default.

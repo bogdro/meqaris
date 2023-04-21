@@ -268,7 +268,30 @@ server's own commands and since you know e.g. the alias which is being
 processed, you can add it to the other command's options, like so:
 </p>
 <pre>
-room1: |"meqaris"| some-other-command "room1"</pre>
+	room1: |"meqaris"| some-other-command "room1"</pre>
+
+<p>
+Meqaris will substitute the following strings in the command you set in the
+ <code>mail_command</code> parameter:
+</p>
+<ul>
+ <li><code>%from%</code> gets substituted by the value of the <code>From</code> header in the response
+  (which is the resource's name and e-mail address),
+ <li><code>%to%</code> gets substituted by the value of the <code>To</code> header in the response
+  (which usually is the meeting Organizer),
+ <li><code>%cc%</code> gets substituted by the value of the <code>Cc</code> header in the response
+  (which usually is the address of the sender of the invitation, which can
+  be different than the Organizer),
+ <li><code>%subject%</code> gets substituted by the subject of the response e-mail,
+ <li><code>%action%</code> gets substituted by the action Meqaris took - <code>Accepted</code>
+  or <code>Declined</code>.
+</ul>
+<p>
+This way, you can pipe your responses to another mailing mechanism, e.g.:
+</p>
+<pre>
+	meqaris --set mail_command --value 'some_mail_program --from "%from%" --to "%to%"'
+	meqaris --set mail_sending_method --value mail_command</pre>
 
 <p>
 For a password-less, local-only mail submission, add this to your
