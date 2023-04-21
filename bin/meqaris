@@ -67,7 +67,7 @@ eval {
 
 # ============================ Command line processing =======================
 
-sub send_mail ($$$@);
+sub send_mail ($$$$@);
 sub val ($);
 sub clean_name ($);
 sub prop_array ($$);
@@ -940,7 +940,7 @@ for my $p (@parts) {
 								push @response_details, 'You are not the organizer of the attached event.';
 								push @response_details, "The attached event's organizer is '$organizer_mail'.";
 								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
+									$organizer_mail, 'Declined', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 								next AT;
@@ -957,7 +957,7 @@ for my $p (@parts) {
 								push @response_details, 'You are not the organizer of the updated event.';
 								push @response_details, "The updated event's original organizer is '$organizer_mail'.";
 								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
+									$organizer_mail, 'Declined', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 								next AT;
@@ -990,7 +990,7 @@ for my $p (@parts) {
 								push @response_details, "The database error is:\n" . $dberr;
 								$dbh->rollback if $updating;
 								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
+									$organizer_mail, 'Declined', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 								next AT;
@@ -1012,7 +1012,7 @@ for my $p (@parts) {
 								push @response_details, 'The event has an infinite number of occurrences. Please specify either a finite number of occurrences or an ending date.';
 								$dbh->rollback if $updating;
 								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
+									$organizer_mail, 'Declined', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 								next AT; # decline by each attendee
@@ -1061,7 +1061,7 @@ for my $p (@parts) {
 										push @response_details, "The database error is:\n" . $dbh->errstr;
 										$dbh->rollback if $updating;
 										$processed = send_mail ($event, $reply_sender,
-											'Declined', \@response_details);
+											$organizer_mail, 'Declined', \@response_details);
 
 										$replied_attenddees{$reply_sender} = 1;
 										$was_err = 1;
@@ -1077,7 +1077,7 @@ for my $p (@parts) {
 									push @response_details, "The database error is:\n" . $dbh->errstr;
 									$dbh->rollback if $updating;
 									$processed = send_mail ($event, $reply_sender,
-										'Declined', \@response_details);
+										$organizer_mail, 'Declined', \@response_details);
 
 									$replied_attenddees{$reply_sender} = 1;
 									$was_err = 1;
@@ -1142,7 +1142,7 @@ for my $p (@parts) {
 										push @response_details, 'Neither DTEND nor DURATION specified.';
 										$dbh->rollback if $updating;
 										$processed = send_mail ($event, $reply_sender,
-											'Declined', \@response_details);
+											$organizer_mail, 'Declined', \@response_details);
 
 										$replied_attenddees{$reply_sender} = 1;
 										next AT;
@@ -1166,7 +1166,7 @@ for my $p (@parts) {
 											push @response_details, "The database error is:\n" . $dbh->errstr;
 											$dbh->rollback if $updating;
 											$processed = send_mail ($event, $reply_sender,
-												'Declined', \@response_details);
+												$organizer_mail, 'Declined', \@response_details);
 
 											$replied_attenddees{$reply_sender} = 1;
 											$was_err = 1;
@@ -1182,7 +1182,7 @@ for my $p (@parts) {
 										push @response_details, "The database error is:\n" . $dbh->errstr;
 										$dbh->rollback if $updating;
 										$processed = send_mail ($event, $reply_sender,
-											'Declined', \@response_details);
+											$organizer_mail, 'Declined', \@response_details);
 
 										$replied_attenddees{$reply_sender} = 1;
 										$was_err = 1;
@@ -1197,7 +1197,7 @@ for my $p (@parts) {
 								$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
 								$dbh->commit if $updating;
 								$processed = send_mail ($event, $reply_sender,
-									'Accepted', \@response_details);
+									$organizer_mail, 'Accepted', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 							}
@@ -1252,7 +1252,7 @@ for my $p (@parts) {
 							push @response_details, 'None of: DTEND, DURATION, RDATE or RRULE specified.';
 							$dbh->rollback if $updating;
 							$processed = send_mail ($event, $reply_sender,
-								'Declined', \@response_details);
+								$organizer_mail, 'Declined', \@response_details);
 
 							$replied_attenddees{$reply_sender} = 1;
 							next AT;
@@ -1276,7 +1276,7 @@ for my $p (@parts) {
 								push @response_details, "The database error is:\n" . $dbh->errstr;
 								$dbh->rollback if $updating;
 								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
+									$organizer_mail, 'Declined', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 								next AT;
@@ -1286,7 +1286,7 @@ for my $p (@parts) {
 								$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
 								$dbh->commit if $updating;
 								$processed = send_mail ($event, $reply_sender,
-									'Accepted', \@response_details);
+									$organizer_mail, 'Accepted', \@response_details);
 
 								$replied_attenddees{$reply_sender} = 1;
 								next AT;
@@ -1301,7 +1301,7 @@ for my $p (@parts) {
 							push @response_details, "The database error is:\n" . $dbh->errstr;
 							$dbh->rollback if $updating;
 							$processed = send_mail ($event, $reply_sender,
-								'Declined', \@response_details);
+								$organizer_mail, 'Declined', \@response_details);
 
 							$replied_attenddees{$reply_sender} = 1;
 							next AT;
@@ -1314,7 +1314,7 @@ for my $p (@parts) {
 						push @response_details, 'The resource you selected has been disabled.';
 						$dbh->rollback if $updating;
 						$processed = send_mail ($event, $reply_sender,
-							'Declined', \@response_details);
+							$organizer_mail, 'Declined', \@response_details);
 						$replied_attenddees{$reply_sender} = 1;
 						next AT;
 					}
@@ -1476,10 +1476,11 @@ sub send_mail ($$$@) {
 
 	my $event = shift;
 	my $from = shift;
+	my $organizer_mail = shift;
 	my $response_type = shift;
 	my $response_details = shift;
 
-	log_debug "Preparing response '$response_type: $subject' from '$from' to '$sender'";
+	log_debug "Preparing response '$response_type: $subject' from '$from' to '$organizer_mail' and Cc '$sender'";
 
 	my $from_full = "<$from>";
 	if ( defined ($res) && defined ($res->{$from}) && defined ($res->{$from}->{'r_name'}) ) {
@@ -1489,7 +1490,7 @@ sub send_mail ($$$@) {
 
 	my $calendar_reply = Data::ICal->new(rfc_strict => 1);
 	$calendar_reply->add_entry($event);
-	$calendar_reply->add_property('PRODID', "Meqaris - https://meqaris.sourceforge.io/");
+	$calendar_reply->add_property('PRODID', 'Meqaris - https://meqaris.sourceforge.io/');
 	$calendar_reply->add_property('METHOD', 'REPLY');
 
 	my @mail_lines = ("$response_type: $subject\n");
@@ -1503,12 +1504,13 @@ sub send_mail ($$$@) {
 	my $mail = MIME::Entity->build (
 		#Type => 'multipart/mixed', # set automatically
 		From => $from_full,
-		To => $sender,
+		To => $organizer_mail,
+		Cc => $sender,
 		Subject => substr ("$response_type: $subject", 0, 78), # length - rfc2822
 		Encoding => 'quoted-printable',
 		Data => \@mail_lines
 	);
-	$mail->head->add('Comments', "Generated by Meqaris - https://meqaris.sourceforge.io/");
+	$mail->head->add('Comments', 'Generated by Meqaris - https://meqaris.sourceforge.io/');
 	$mail->attach(
 		Data => $calendar_reply->as_string,
 		Type => 'text/calendar; method=REPLY',
@@ -1524,7 +1526,7 @@ sub send_mail ($$$@) {
 
 			# remove any pipe symbols first:
 			$mail_command =~ s/^\s*\|\s*//o;
-			log_info "Sending response to '$sender' using command '$mail_command'";
+			log_info "Sending response to '$organizer_mail' and Cc '$sender' using command '$mail_command'";
 			open (my $cmd, '|-', $mail_command);
 			if ( ! $cmd ) {
 				log_warn "Mail_sending_method = mail_command, but the command failed to run: $!." .
@@ -1543,14 +1545,15 @@ sub send_mail ($$$@) {
 		# send by mail (the default)
 		my %send_cfg = (
 			MailFrom => $from_full,
-			To => $sender);
+			To => $organizer_mail,
+			Cc => $sender);
 		my $mail_server = $dbcfg->{'mail_server'}->{'c_value'};
 		my $mail_server_port = $dbcfg->{'mail_server_port'}->{'c_value'};
 		$send_cfg{Host} = $mail_server if ! is_empty ($mail_server);
 		$send_cfg{Port} = $mail_server_port if ! is_empty ($mail_server_port);
 		$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
 
-		log_info "Sending response to '$sender' using " .
+		log_info "Sending response to '$organizer_mail' and Cc '$sender' using " .
 			"mail_server:port='" .
 			(defined ($mail_server)? $mail_server : '(default)') .
 			':' . (defined ($mail_server_port)? $mail_server_port : '(default port)') ."'";
