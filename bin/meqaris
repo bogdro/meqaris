@@ -72,6 +72,7 @@ sub val ($);
 sub clean_name ($);
 sub prop_array ($$);
 sub is_empty ($);
+sub get_sender_mail;
 sub db_stmt ($$);
 sub db_stmt_print ($$);
 sub db_version ($);
@@ -923,13 +924,7 @@ for my $p (@parts) {
 
 							log_info 'This event is an update.';
 							# check if the sender is the organizer and decline if not
-							my $sender_mail;
-							if ( $sender =~ /<([^>]+)>/o ) {
-								$sender_mail = $1;
-							}
-							else {
-								$sender_mail = $sender;
-							}
+							my $sender_mail = get_sender_mail();
 							log_trace "Checking sender vs. event's organizer.";
 							if ( $sender_mail ne $organizer_mail ) {
 
@@ -1335,13 +1330,7 @@ for my $p (@parts) {
 					next;
 				}
 				log_trace 'Comparing sender and organizer e-mail addresses.';
-				my $sender_mail;
-				if ( $sender =~ /<([^>]+)>/o ) {
-					$sender_mail = $1;
-				}
-				else {
-					$sender_mail = $sender;
-				}
+				my $sender_mail = get_sender_mail();
 				if ( $sender_mail ne $organizer_mail ) {
 
 					log_info "Sender '$sender_mail' is not event's organizer '$organizer_mail' - ignoring.";
@@ -1606,6 +1595,19 @@ sub is_empty ($) {
 	return ((defined ($v) && $v ne '')? 0 : 1);
 }
 
+# ============================ get_sender_mail ===================================
+
+sub get_sender_mail {
+
+	my $sender_mail;
+	if ( $sender =~ /<([^>]+)>/o ) {
+		$sender_mail = $1;
+	}
+	else {
+		$sender_mail = $sender;
+	}
+	return $sender_mail;
+}
 # ============================ db_connect ===================================
 
 sub db_connect {
