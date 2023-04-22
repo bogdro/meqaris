@@ -1431,10 +1431,11 @@ for my $p (@parts) {
 	last if $processed;
 }
 
-$dbh->disconnect;
-$parser->filer->purge;
-dbunlock();
-
+END {
+	$dbh->disconnect if $dbh;
+	$parser->filer->purge if $parser;
+	dbunlock();
+}
 exit 0;
 
 # ============================ Subroutines: ===================================
