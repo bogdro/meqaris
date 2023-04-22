@@ -1733,14 +1733,14 @@ sub db_upgrade ($) {
 
 			# new database - just run the full script (in a transaction)
 			$dbh->begin_work();
-			if (! db_run_file ($dbh, "$inicfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
+			if (db_run_file ($dbh, "$inicfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
 
+				$dbh->commit();
+			}
+			else {
 				log_fatal "Can't update database version to $meqaris_dbversion.";
 				$dbh->rollback();
 				$ret = 0;
-			}
-			else {
-				$dbh->commit();
 			}
 		}
 		elsif ($db_ver < $meqaris_dbversion) {
