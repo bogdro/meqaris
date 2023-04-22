@@ -366,4 +366,44 @@ Currently, the following user-modifiable parameters are supported:
 
 </ul>
 
+<hr>
+<h2 class="c">Troubleshooting</h2>
+
+<ul>
+ <li>If you get errors similar to:
+	<pre>	Can't locate X in @INC (you may need to install the X module)</pre>
+	then make sure that all the required Perl modules and their dependencies are
+	installed. If you installed them in non-standard locations, you may need to
+	run Meqaris by using the <code>perl</code> command and pass the required paths in the
+	<code>-I</code> parameter, e.g.
+	<pre>    perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini</pre>
+	</li>
+ <li>If the <code>--status</code> command displays something like:
+	<pre>
+	Configuration file '/path/to/meqaris.ini': OK
+	Data directory: '/path/to/meqaris/data': OK
+	Database connection: ERROR: cannot connect: connection to server at
+	 "127.0.0.1", port 5432 failed: Connection refused
+         Is the server running on that host and accepting TCP/IP connections?</pre>
+
+	then check:
+	<ul>
+	 <li>if the database connection parameters in the INI file are correct,</li>
+	 <li>if the database is actually running.</li>
+	</ul>
+	</li>
+ <li>If you send e-mail invitation to Meqaris, but don't get a response, then:
+	<ul>
+	 <li>check your mail server configuration if the invitations are properly
+	  passed to Meqaris,</li>
+	 <li>check your mail server logs if the invitations were in fact sent to Meqaris</li>
+	 <li>save your e-mail to a text file, send it to Meqaris by hand:
+	  <pre>	meqaris --conf /path/to/meqaris.ini &lt; your_mail.eml</pre>
+	  and examine the output,</li>
+	 <li>check the Meqaris' logs for more information. Increase the logging level
+	  if necessary.</li>
+	 </ul>
+	 </li>
+</ul>
+
 </body></html>
