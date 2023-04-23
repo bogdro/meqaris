@@ -68,6 +68,7 @@ eval {
 # ============================ Command line processing =======================
 
 sub send_mail ($$$$@);
+sub process_insert_error ($$$$$);
 sub val ($);
 sub clean_name ($);
 sub prop_array ($$);
@@ -1063,39 +1064,15 @@ for my $p (@parts) {
 								$stmth->execute(@values_insert);
 								if ( $dbh->errstr ) {
 
-									log_error "Error inserting new recurring event:\n" .
-										$dbh->errstr . "\n - declining.";
-									# DB error - decline
-									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-									push @response_details, 'Unable to insert the event.';
-									if ( $dbh->errstr =~ /rr_interval_excl/o ) {
-										push @response_details, 'The resource is booked in the selected period.';
-									}
-									elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
-										push @response_details, 'You tried to create an event in the past.';
-									}
-									push @response_details, "The database error is:\n" . $dbh->errstr;
-									$dbh->rollback if $updating;
-									$processed = send_mail ($event, $reply_sender,
-										$organizer_mail, 'Declined', \@response_details);
-
-									$replied_attenddees{$reply_sender} = 1;
+									$processed = process_insert_error ($event, $attendee,
+										$organizer_mail, $updating, $reply_sender);
 									$was_err = 1;
 									last;
 								}
 							}
 							else {
-								log_error "Error inserting new recurring event:\n" .
-									$dbh->errstr . "\n- declining.";
-								# DB error - decline
-								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-								push @response_details, 'Unable to insert the event.';
-								push @response_details, "The database error is:\n" . $dbh->errstr;
-								$dbh->rollback if $updating;
-								$processed = send_mail ($event, $reply_sender,
-									$organizer_mail, 'Declined', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
+								$processed = process_insert_error ($event, $attendee,
+									$organizer_mail, $updating, $reply_sender);
 								$was_err = 1;
 								last;
 							}
@@ -1168,39 +1145,15 @@ for my $p (@parts) {
 									$stmth->execute(@values_insert);
 									if ( $dbh->errstr ) {
 
-										log_error "Error inserting new recurring event:\n" .
-											$dbh->errstr . "\n - declining.";
-										# DB error - decline
-										$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-										push @response_details, 'Unable to insert the event.';
-										if ( $dbh->errstr =~ /rr_interval_excl/o ) {
-											push @response_details, 'The resource is booked in the selected period.';
-										}
-										elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
-											push @response_details, 'You tried to create an event in the past.';
-										}
-										push @response_details, "The database error is:\n" . $dbh->errstr;
-										$dbh->rollback if $updating;
-										$processed = send_mail ($event, $reply_sender,
-											$organizer_mail, 'Declined', \@response_details);
-
-										$replied_attenddees{$reply_sender} = 1;
+										$processed = process_insert_error ($event, $attendee,
+											$organizer_mail, $updating, $reply_sender);
 										$was_err = 1;
 										last;
 									}
 								}
 								else {
-									log_error "Error inserting new recurring event:\n" .
-										$dbh->errstr . "\n- declining.";
-									# DB error - decline
-									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-									push @response_details, 'Unable to insert the event.';
-									push @response_details, "The database error is:\n" . $dbh->errstr;
-									$dbh->rollback if $updating;
-									$processed = send_mail ($event, $reply_sender,
-										$organizer_mail, 'Declined', \@response_details);
-
-									$replied_attenddees{$reply_sender} = 1;
+									$processed = process_insert_error ($event, $attendee,
+										$organizer_mail, $updating, $reply_sender);
 									$was_err = 1;
 									last;
 								}
@@ -1278,23 +1231,8 @@ for my $p (@parts) {
 						$stmth->execute(@values_insert);
 						if ( $dbh->errstr ) {
 
-							log_error "Error inserting new event:\n" .
-								$dbh->errstr . "\n- declining.";
-							# DB error - decline
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-							push @response_details, 'Unable to insert the event.';
-							if ( $dbh->errstr =~ /rr_interval_excl/o ) {
-								push @response_details, 'The resource is booked in the selected period.';
-							}
-							elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
-								push @response_details, 'You tried to create an event in the past.';
-							}
-							push @response_details, "The database error is:\n" . $dbh->errstr;
-							$dbh->rollback if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Declined', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
+							$processed = process_insert_error ($event, $attendee,
+								$organizer_mail, $updating, $reply_sender);
 							next AT;
 						}
 						else {
@@ -1309,17 +1247,8 @@ for my $p (@parts) {
 						}
 					}
 					else {
-						log_error "Error inserting new event:\n" .
-							$dbh->errstr . "\n- declining.";
-						# DB error - decline
-						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-						push @response_details, 'Unable to insert the event.';
-						push @response_details, "The database error is:\n" . $dbh->errstr;
-						$dbh->rollback if $updating;
-						$processed = send_mail ($event, $reply_sender,
-							$organizer_mail, 'Declined', \@response_details);
-
-						$replied_attenddees{$reply_sender} = 1;
+						$processed = process_insert_error ($event, $attendee,
+							$organizer_mail, $updating, $reply_sender);
 						next AT;
 					}
 				}
@@ -1578,6 +1507,37 @@ sub send_mail ($$$$@) {
 		return 1;
 	}
 	return 0;
+}
+
+# ============================ process_insert_error ===================================
+
+sub process_insert_error($$$$$) {
+
+	my $event = shift;
+	my $attendee = shift;
+	my $organizer_mail = shift;
+	my $updating = shift;
+	my $reply_sender = shift;
+
+	my @response_details = ();
+	my $processed;
+
+	log_error "Error inserting new event:\n" . $dbh->errstr . "\n- declining.";
+	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+	push @response_details, 'Unable to insert the event.';
+	if ( $dbh->errstr =~ /rr_interval_excl/o ) {
+		push @response_details, 'The resource is booked in the selected period.';
+	}
+	elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
+		push @response_details, 'You tried to create an event in the past.';
+	}
+	push @response_details, "The database error is:\n" . $dbh->errstr;
+	$dbh->rollback if $updating;
+	$processed = send_mail ($event, $reply_sender,
+		$organizer_mail, 'Declined', \@response_details);
+
+	$replied_attenddees{$reply_sender} = 1;
+	return $processed;
 }
 
 # ============================ val ===================================
