@@ -869,7 +869,7 @@ for my $p (@parts) {
 				# Skip if not one of our resources:
 				if ( ! defined ($res->{$reply_sender}) ) {
 
-					log_debug "Attendee '$reply_sender' doesn't match.";
+					log_debug "Attendee '$reply_sender' doesn't match any resource, skipping.";
 					next;
 				}
 				log_debug "Attendee '$reply_sender' found";
@@ -1718,8 +1718,9 @@ sub db_run_file ($$) {
 	my $f = undef;
 	if ( ! open ($f, '<', $filename) ) {
 
-		log_fatal "Database upgrade: cannot open file '$filename': $!";
-		print "Database upgrade: cannot open file '$filename': $!". "\n";
+		my $msg = "Database upgrade: cannot open file '$filename': $!";
+		log_fatal $msg;
+		print $msg. "\n";
 		return 0;
 	}
 	my $file_contents = join("\n", <$f>);
@@ -1730,8 +1731,9 @@ sub db_run_file ($$) {
 	$stmth->execute();
 	if ( $dbh->errstr ) {
 
-		log_fatal "Database upgrade: cannot execute file '$filename': " . $dbh->errstr;
-		print "Database upgrade: cannot execute file '$filename': " . $dbh->errstr . "\n";
+		my $msg = "Database upgrade: cannot execute file '$filename': " . $dbh->errstr;
+		log_fatal $msg;
+		print $msg . "\n";
 		return 0;
 	}
 	return 1;
