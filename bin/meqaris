@@ -1659,7 +1659,7 @@ sub db_connect_print {
 	my $dbh = db_connect();
 	if ( ! $dbh ) {
 
-		print 'Database: cannot connect: ' . $DBI::errstr . "\n";
+		print 'Database: cannot connect: ' . ((defined $DBI::errstr)? $DBI::errstr : '') . "\n";
 		exit 2;
 	}
 	return $dbh;
