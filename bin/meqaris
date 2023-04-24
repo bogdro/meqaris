@@ -916,7 +916,7 @@ for my $p (@parts) {
 
 						log_debug 'Event already exists - checking if this is an update.';
 
-						# an update can imply changing a resource, so do not check resource ID!
+						# an update can imply changing a resource, so do not check the resource ID!
 						#if ( defined ($old_event->{'rr_r_id'})
 						#	&& $res->{$reply_sender}->{'r_id'} == $old_event->{'rr_r_id'} ) {
 
@@ -1141,7 +1141,6 @@ for my $p (@parts) {
 							$updating, $reply_sender, \@response_details);
 						next AT;
 					}
-
 				}
 				else {
 					log_info 'Resource disabled - declining.';
@@ -1475,18 +1474,13 @@ sub insert_event (\%) {
 			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
 			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + (cast ($4 as timestamp with time zone) - cast ($3 as timestamp with time zone))) || \')\' as tstzrange)), ' .
 			'$5, $6, $7, $8, $9, $10)');
-		@values_insert = (
-			$res->{$reply_sender}->{'r_id'},
+		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			$params->{'start_string'},
 			$params->{'dt_start_conv'},
 			$params->{'dt_end_conv'},
-			$params->{'organizer_mail'},
-			$params->{'summary'},
-			$params->{'dtstamp_conv'},
-			$params->{'uid'},
-			$params->{'sequence'},
-			$params->{'orig_invitation'}
-			);
+			$params->{'organizer_mail'}, $params->{'summary'},
+			$params->{'dtstamp_conv'}, $params->{'uid'},
+			$params->{'sequence'}, $params->{'orig_invitation'});
 	}
 	elsif ( defined ($params->{'dt_end_conv'}) ) {
 
@@ -1496,16 +1490,11 @@ sub insert_event (\%) {
 			'insert into meqaris.meq_resource_reservations ' .
 			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
 			'values ($1, $2, $3, $4, $5, $6, $7, $8)');
-		@values_insert = (
-			$res->{$reply_sender}->{'r_id'},
+		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			"[$params->{'dt_start_conv'}, $params->{'dt_end_conv'})",
-			$params->{'organizer_mail'},
-			$params->{'summary'},
-			$params->{'dtstamp_conv'},
-			$params->{'uid'},
-			$params->{'sequence'},
-			$params->{'orig_invitation'}
-			);
+			$params->{'organizer_mail'}, $params->{'summary'},
+			$params->{'dtstamp_conv'}, $params->{'uid'},
+			$params->{'sequence'}, $params->{'orig_invitation'});
 	}
 	elsif ( defined ($params->{'duration'}) ) {
 
@@ -1516,17 +1505,12 @@ sub insert_event (\%) {
 			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
 			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
 			'$4, $5, $6, $7, $8, $9)');
-		@values_insert = (
-			$res->{$reply_sender}->{'r_id'},
+		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			defined ($params->{'start_string'})? $params->{'start_string'} : $params->{'dt_start_conv'},
 			val ($params->{'duration'}),
-			$params->{'organizer_mail'},
-			$params->{'summary'},
-			$params->{'dtstamp_conv'},
-			$params->{'uid'},
-			$params->{'sequence'},
-			$params->{'orig_invitation'}
-			);
+			$params->{'organizer_mail'}, $params->{'summary'},
+			$params->{'dtstamp_conv'}, $params->{'uid'},
+			$params->{'sequence'}, $params->{'orig_invitation'});
 	}
 	else {
 		my $msg = 'Neither DTEND nor DURATION defined in a recurring event or none of: '
@@ -1818,8 +1802,8 @@ sub dblock () {
 
 	sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT);
 	if ( ! defined ($lock_fd) ) {
-		my $start_time = time;
 
+		my $start_time = time;
 		log_trace 'Waiting for lock';
 
 		while ( time < $start_time + 30 ) {
@@ -1832,7 +1816,6 @@ sub dblock () {
 			}
 			sleep 1;
 		}
-
 		log_trace 'Waiting for lock finished';
 
 		if ( time >= $start_time + 30 ) {
