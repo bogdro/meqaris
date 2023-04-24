@@ -69,6 +69,7 @@ eval {
 
 sub send_mail ($$$$@);
 sub send_accept ($$$$$$);
+sub send_decline ($$$$$$);
 sub process_insert_error ($$$$$);
 sub insert_event (\%);
 sub val ($);
@@ -954,15 +955,11 @@ for my $p (@parts) {
 						if ( $sender_mail ne $organizer_mail ) {
 
 							log_info "Sender '$sender_mail' is not event's organizer '$organizer_mail' - declining.";
-							$dbh->rollback if $updating;
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 							push @response_details, 'Declined for security reasons.';
 							push @response_details, 'You are not the organizer of the attached event.';
 							push @response_details, "The attached event's organizer is '$organizer_mail'.";
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Declined', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
 							next AT;
 						}
 						log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
@@ -971,15 +968,11 @@ for my $p (@parts) {
 
 							log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
 								$old_event->{'rr_organiser'} . "' - declining.";
-							$dbh->rollback if $updating;
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 							push @response_details, 'Declined for security reasons.';
 							push @response_details, 'You are not the organizer of the updated event.';
 							push @response_details, "The updated event's original organizer is '$organizer_mail'.";
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Declined', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
 							next AT;
 						}
 						log_debug "Sender '$sender_mail' is the same organizer as in the database. Deleting old event.";
@@ -1003,16 +996,11 @@ for my $p (@parts) {
 							$dberr = $dbh->errstr;
 						}
 						if ( $dberr ) {
-							log_error "Error deleting old event:\n" .
-								$dberr;
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+							log_error "Error deleting old event:\n" . $dberr;
 							push @response_details, 'Unable to delete the event being updated.';
 							push @response_details, "The database error is:\n" . $dberr;
-							$dbh->rollback if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Declined', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
 							next AT;
 						}
 					} # for my $old_event (@old_events)
@@ -1029,13 +1017,9 @@ for my $p (@parts) {
 						if ( $dates->max->isa('DateTime::Infinite::Future') ) { # works for DateTime::Set and DateTime::SpanSet (for periods)
 
 							log_info 'The event has an infinite number of occurrences - declining.';
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 							push @response_details, 'The event has an infinite number of occurrences. Please specify either a finite number of occurrences or an ending date.';
-							$dbh->rollback if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Declined', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
 							next AT; # decline by each attendee
 						}
 						# start transaction for the INSERTs if not in one already
@@ -1143,14 +1127,11 @@ for my $p (@parts) {
 					}
 				}
 				else {
-					log_info 'Resource disabled - declining.';
 					# Attendee disabled - decline
-					$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+					log_info 'Resource disabled - declining.';
 					push @response_details, 'The resource you selected has been disabled.';
-					$dbh->rollback if $updating;
-					$processed = send_mail ($event, $reply_sender,
-						$organizer_mail, 'Declined', \@response_details);
-					$replied_attenddees{$reply_sender} = 1;
+					$processed = send_decline ($event, $attendee, $organizer_mail,
+						$updating, $reply_sender, \@response_details);
 					next AT;
 				}
 			} # for my $attendee
@@ -1419,6 +1400,26 @@ sub send_accept ($$$$$$) {
 	return $processed;
 }
 
+# ============================ send_decline ===================================
+
+sub send_decline ($$$$$$) {
+
+	my $event = shift;
+	my $attendee = shift;
+	my $organizer_mail = shift;
+	my $updating = shift;
+	my $reply_sender = shift;
+	my $response_details = shift;
+
+	$dbh->rollback if $updating;
+	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+	my $processed = send_mail ($event, $reply_sender,
+		$organizer_mail, 'Declined', $response_details);
+
+	$replied_attenddees{$reply_sender} = 1;
+	return $processed;
+}
+
 # ============================ process_insert_error ===================================
 
 sub process_insert_error($$$$$) {
@@ -1432,7 +1433,6 @@ sub process_insert_error($$$$$) {
 	my @response_details = ();
 
 	log_error "Error inserting new event:\n" . $dbh->errstr . "\n- declining.";
-	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
 	push @response_details, 'Unable to insert the event.';
 	if ( $dbh->errstr =~ /rr_interval_excl/o ) {
 		push @response_details, 'The resource is booked in the selected period.';
@@ -1441,9 +1441,8 @@ sub process_insert_error($$$$$) {
 		push @response_details, 'You tried to create an event in the past.';
 	}
 	push @response_details, "The database error is:\n" . $dbh->errstr;
-	$dbh->rollback if $updating;
-	my $processed = send_mail ($event, $reply_sender,
-		$organizer_mail, 'Declined', \@response_details);
+	my $processed = send_decline ($event, $attendee, $organizer_mail,
+		$updating, $reply_sender, \@response_details);
 
 	$replied_attenddees{$reply_sender} = 1;
 	return $processed;
@@ -1517,14 +1516,11 @@ sub insert_event (\%) {
 			.'DTEND, DURATION, RDATE or RRULE defined.';
 		log_info $msg . ' Declining anniversary-type event or an event that takes no time.';
 
-		$params->{'attendee'}->parameters->{'PARTSTAT'} = 'DECLINED';
 		push @response_details, 'This event takes no time, so it needs no resources.';
 		push @response_details, $msg;
-		$dbh->rollback if $params->{'updating'};
-		$processed = send_mail ($params->{'event'}, $reply_sender,
-			$params->{'organizer_mail'}, 'Declined', \@response_details);
-
-		$replied_attenddees{$reply_sender} = 1;
+		$processed = send_decline ($params->{'event'}, $params->{'attendee'},
+			$params->{'organizer_mail'}, $params->{'updating'},
+			$reply_sender, \@response_details);
 		$next = 1;
 	}
 	if ( $stmth ) {
