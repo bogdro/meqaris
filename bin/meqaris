@@ -68,6 +68,7 @@ eval {
 # ============================ Command line processing =======================
 
 sub send_mail ($$$$@);
+sub send_accept ($$$$$$);
 sub process_insert_error ($$$$$);
 sub insert_event (\%);
 sub val ($);
@@ -1108,13 +1109,8 @@ for my $p (@parts) {
 						if ( ! $was_err ) {
 
 							log_info "Inserted recurring event for attendee '$reply_sender'.";
-
-							$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
-							$dbh->commit if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Accepted', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
+							$processed = send_accept ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
 						}
 						# NOTE: recurring event inserted - do not proceed with the normal!
 						next AT;
@@ -1141,12 +1137,8 @@ for my $p (@parts) {
 					if ( ! $was_err ) {
 
 						log_info "Inserted for attendee '$reply_sender'.";
-						$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
-						$dbh->commit if $updating;
-						$processed = send_mail ($event, $reply_sender,
-							$organizer_mail, 'Accepted', \@response_details);
-
-						$replied_attenddees{$reply_sender} = 1;
+						$processed = send_accept ($event, $attendee, $organizer_mail,
+							$updating, $reply_sender, \@response_details);
 						next AT;
 					}
 
@@ -1408,6 +1400,26 @@ sub send_mail ($$$$@) {
 	return 0;
 }
 
+# ============================ send_accept ===================================
+
+sub send_accept ($$$$$$) {
+
+	my $event = shift;
+	my $attendee = shift;
+	my $organizer_mail = shift;
+	my $updating = shift;
+	my $reply_sender = shift;
+	my $response_details = shift;
+
+	$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+	$dbh->commit if $updating;
+	my $processed = send_mail ($event, $reply_sender,
+		$organizer_mail, 'Accepted', $response_details);
+
+	$replied_attenddees{$reply_sender} = 1;
+	return $processed;
+}
+
 # ============================ process_insert_error ===================================
 
 sub process_insert_error($$$$$) {
@@ -1419,7 +1431,6 @@ sub process_insert_error($$$$$) {
 	my $reply_sender = shift;
 
 	my @response_details = ();
-	my $processed;
 
 	log_error "Error inserting new event:\n" . $dbh->errstr . "\n- declining.";
 	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
@@ -1432,7 +1443,7 @@ sub process_insert_error($$$$$) {
 	}
 	push @response_details, "The database error is:\n" . $dbh->errstr;
 	$dbh->rollback if $updating;
-	$processed = send_mail ($event, $reply_sender,
+	my $processed = send_mail ($event, $reply_sender,
 		$organizer_mail, 'Declined', \@response_details);
 
 	$replied_attenddees{$reply_sender} = 1;
