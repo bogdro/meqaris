@@ -69,7 +69,9 @@ eval {
 
 sub send_mail ($$$$@);
 sub process_insert_error ($$$$$);
+sub insert_event (\%);
 sub val ($);
+sub val_limit ($);
 sub clean_name ($);
 sub prop_array ($$);
 sub is_empty ($);
@@ -1017,6 +1019,7 @@ for my $p (@parts) {
 					log_info 'Inserting new event';
 					$stmth = undef;
 					my @values_insert = undef;
+					my $was_err = 0;
 					if ( defined ($rdates) || defined ($rrules) ) {
 
 						log_trace 'RDATE or RRULE defined - building recurring events.';
@@ -1037,7 +1040,6 @@ for my $p (@parts) {
 						# start transaction for the INSERTs if not in one already
 						$dbh->begin_work() if ! $updating;
 						$updating = 1;
-						my $was_err = 0;
 
 						# process periods in RDATE separately,
 						# otherwise it breaks the DateTime::Set
@@ -1052,10 +1054,10 @@ for my $p (@parts) {
 							@values_insert = (
 								$res->{$reply_sender}->{'r_id'},
 								'[' . $period->start . ',' . $period->end . ')',
-								substr ($organizer_mail, 0, 1000),
-								substr (val ($summary), 0, 1000),
+								val_limit ($organizer_mail),
+								val_limit (val ($summary)),
 								$dtstamp_conv,
-								substr (val ($uid), 0, 1000),
+								val_limit (val ($uid)),
 								(defined ($sequence))? $sequence->value : 0,
 								encode_base64 ($orig_invitation)
 								);
@@ -1079,84 +1081,28 @@ for my $p (@parts) {
 						}
 						if ( ! $was_err ) {
 							my $iter = $dates->iterator;
+							my $next = 0;
+							my $last = 0;
+							my %params = (
+								dt_start_conv => $dt_start_conv,
+								dt_end_conv => $dt_end_conv,
+								duration => $duration, # MUST pass as-is for the 'defined' test
+								organizer_mail => val_limit ($organizer_mail),
+								summary => val_limit (val ($summary)),
+								dtstamp_conv => $dtstamp_conv,
+								uid => val_limit (val ($uid)),
+								sequence => (defined ($sequence))? $sequence->value : 0,
+								orig_invitation => encode_base64 ($orig_invitation),
+								event => $event,
+								attendee => $attendee,
+								updating => $updating
+							);
 							while ( my $dt = $iter->next ) {
 
-								if ( defined ($dt_end_conv) ) {
-
-									log_trace 'Recurring event - DTEND defined - inserting intervals.';
-
-									# calculate each end by adding the
-									# event's interval 'dtend - dtstart'
-									# to each event occurrence's start
-									$stmth = db_stmt ($dbh,
-										'insert into meqaris.meq_resource_reservations ' .
-										'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-										'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + (cast ($4 as timestamp with time zone) - cast ($3 as timestamp with time zone))) || \')\' as tstzrange)), ' .
-										'$5, $6, $7, $8, $9, $10)');
-									@values_insert = (
-										$res->{$reply_sender}->{'r_id'},
-										$dt->stringify,
-										$dt_start_conv,
-										$dt_end_conv,
-										substr ($organizer_mail, 0, 1000),
-										substr (val ($summary), 0, 1000),
-										$dtstamp_conv,
-										substr (val ($uid), 0, 1000),
-										(defined ($sequence))? $sequence->value : 0,
-										encode_base64 ($orig_invitation)
-										);
-								}
-								elsif ( defined ($duration) ) {
-
-									log_trace 'Recurring event - DTEND not defined but DURATION defined - building intervals using DURATION.';
-
-									$stmth = db_stmt ($dbh,
-										'insert into meqaris.meq_resource_reservations ' .
-										'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-										'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
-										'$4, $5, $6, $7, $8, $9)');
-									@values_insert = (
-										$res->{$reply_sender}->{'r_id'},
-										$dt->stringify,
-										val ($duration),
-										substr ($organizer_mail, 0, 1000),
-										substr (val ($summary), 0, 1000),
-										$dtstamp_conv,
-										substr (val ($uid), 0, 1000),
-										(defined ($sequence))? $sequence->value : 0,
-										encode_base64 ($orig_invitation)
-										);
-								}
-								else {
-									log_info 'Neither DTEND nor DURATION defined in a recurring event. Declining anniversary-type event or an event that takes no time.';
-
-									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-									push @response_details, 'This event takes no time, so it needs no resources.';
-									push @response_details, 'Neither DTEND nor DURATION specified.';
-									$dbh->rollback if $updating;
-									$processed = send_mail ($event, $reply_sender,
-										$organizer_mail, 'Declined', \@response_details);
-
-									$replied_attenddees{$reply_sender} = 1;
-									next AT;
-								}
-								if ( $stmth ) {
-
-									$stmth->execute(@values_insert);
-									if ( $dbh->errstr ) {
-
-										$processed = process_insert_error ($event, $attendee,
-											$organizer_mail, $updating, $reply_sender);
-										$was_err = 1;
-										last;
-									}
-								}
-								else {
-									$processed = process_insert_error ($event, $attendee,
-										$organizer_mail, $updating, $reply_sender);
-									$was_err = 1;
-									last;
-								}
+								$params{start_string} = $dt->stringify;
+								($processed, $was_err, $next, $last) = insert_event (%params);
+								next AT if $next;
+								last if $last;
 							}
 						}
 						if ( ! $was_err ) {
@@ -1173,84 +1119,37 @@ for my $p (@parts) {
 						# NOTE: recurring event inserted - do not proceed with the normal!
 						next AT;
 					}
-					elsif ( defined ($dt_end_conv) ) {
-
-						log_trace 'DTEND defined - inserting interval directly.';
-
-						$stmth = db_stmt ($dbh,
-							'insert into meqaris.meq_resource_reservations ' .
-							'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-							'values ($1, $2, $3, $4, $5, $6, $7, $8)');
-						@values_insert = (
-							$res->{$reply_sender}->{'r_id'},
-							"[$dt_start_conv, $dt_end_conv)",
-							substr ($organizer_mail, 0, 1000),
-							substr (val ($summary), 0, 1000),
-							$dtstamp_conv,
-							substr (val ($uid), 0, 1000),
-							(defined ($sequence))? $sequence->value : 0,
-							encode_base64 ($orig_invitation)
-							);
-					}
-					elsif ( defined ($duration) ) {
-
-						log_trace 'DTEND not defined but DURATION defined - building interval using DURATION.';
-
-						$stmth = db_stmt ($dbh,
-							'insert into meqaris.meq_resource_reservations ' .
-							'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-							'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
-							'$4, $5, $6, $7, $8, $9)');
-						@values_insert = (
-							$res->{$reply_sender}->{'r_id'},
-							$dt_start_conv,
-							val ($duration),
-							substr ($organizer_mail, 0, 1000),
-							substr (val ($summary), 0, 1000),
-							$dtstamp_conv,
-							substr (val ($uid), 0, 1000),
-							(defined ($sequence))? $sequence->value : 0,
-							encode_base64 ($orig_invitation)
-							);
-					}
 					else {
-						log_info 'None of: DTEND, DURATION, RDATE or RRULE defined. Declining anniversary-type event or an event that takes no time.';
+						my $next = 0;
+						my %params = (
+							dt_start_conv => $dt_start_conv,
+							dt_end_conv => $dt_end_conv,
+							duration => $duration, # MUST pass as-is for the 'defined' test
+							organizer_mail => val_limit ($organizer_mail),
+							summary => val_limit (val ($summary)),
+							dtstamp_conv => $dtstamp_conv,
+							uid => val_limit (val ($uid)),
+							sequence => (defined ($sequence))? $sequence->value : 0,
+							orig_invitation => encode_base64 ($orig_invitation),
+							event => $event,
+							attendee => $attendee,
+							updating => $updating
+						);
+						($processed, $was_err, $next, undef) = insert_event (%params);
+						next AT if $next;
+					}
+					if ( ! $was_err ) {
 
-						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-						push @response_details, 'This event takes no time, so it needs no resources.';
-						push @response_details, 'None of: DTEND, DURATION, RDATE or RRULE specified.';
-						$dbh->rollback if $updating;
+						log_info "Inserted for attendee '$reply_sender'.";
+						$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+						$dbh->commit if $updating;
 						$processed = send_mail ($event, $reply_sender,
-							$organizer_mail, 'Declined', \@response_details);
+							$organizer_mail, 'Accepted', \@response_details);
 
 						$replied_attenddees{$reply_sender} = 1;
 						next AT;
 					}
-					if ( $stmth ) {
 
-						$stmth->execute(@values_insert);
-						if ( $dbh->errstr ) {
-
-							$processed = process_insert_error ($event, $attendee,
-								$organizer_mail, $updating, $reply_sender);
-							next AT;
-						}
-						else {
-							log_info "Inserted for attendee '$reply_sender'.";
-							$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
-							$dbh->commit if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								$organizer_mail, 'Accepted', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
-							next AT;
-						}
-					}
-					else {
-						$processed = process_insert_error ($event, $attendee,
-							$organizer_mail, $updating, $reply_sender);
-						next AT;
-					}
 				}
 				else {
 					log_info 'Resource disabled - declining.';
@@ -1540,12 +1439,133 @@ sub process_insert_error($$$$$) {
 	return $processed;
 }
 
+# ============================ insert_event ===================================
+
+sub insert_event (\%) {
+
+	my $params = shift;
+	my @response_details = ();
+	my $processed = 0;
+	my $was_err = 0;
+	my $next = 0;
+	my $last = 0;
+	my @values_insert = ();
+	my $stmth;
+
+	if ( defined ($params->{'start_string'}) && ! defined ($params->{'duration'}) ) {
+
+		log_trace 'DTEND defined - inserting recurring intervals.';
+
+		# calculate each end by adding the
+		# event's interval 'dtend - dtstart'
+		# to each event occurrence's start
+		$stmth = db_stmt ($dbh,
+			'insert into meqaris.meq_resource_reservations ' .
+			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + (cast ($4 as timestamp with time zone) - cast ($3 as timestamp with time zone))) || \')\' as tstzrange)), ' .
+			'$5, $6, $7, $8, $9, $10)');
+		@values_insert = (
+			$res->{$reply_sender}->{'r_id'},
+			$params->{'start_string'},
+			$params->{'dt_start_conv'},
+			$params->{'dt_end_conv'},
+			$params->{'organizer_mail'},
+			$params->{'summary'},
+			$params->{'dtstamp_conv'},
+			$params->{'uid'},
+			$params->{'sequence'},
+			$params->{'orig_invitation'}
+			);
+	}
+	elsif ( defined ($params->{'dt_end_conv'}) ) {
+
+		log_trace 'DTEND defined - inserting interval directly.';
+
+		$stmth = db_stmt ($dbh,
+			'insert into meqaris.meq_resource_reservations ' .
+			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+			'values ($1, $2, $3, $4, $5, $6, $7, $8)');
+		@values_insert = (
+			$res->{$reply_sender}->{'r_id'},
+			"[$params->{'dt_start_conv'}, $params->{'dt_end_conv'})",
+			$params->{'organizer_mail'},
+			$params->{'summary'},
+			$params->{'dtstamp_conv'},
+			$params->{'uid'},
+			$params->{'sequence'},
+			$params->{'orig_invitation'}
+			);
+	}
+	elsif ( defined ($params->{'duration'}) ) {
+
+		log_trace 'DTEND not defined but DURATION defined - building intervals using DURATION.';
+
+		$stmth = db_stmt ($dbh,
+			'insert into meqaris.meq_resource_reservations ' .
+			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
+			'$4, $5, $6, $7, $8, $9)');
+		@values_insert = (
+			$res->{$reply_sender}->{'r_id'},
+			defined ($params->{'start_string'})? $params->{'start_string'} : $params->{'dt_start_conv'},
+			val ($params->{'duration'}),
+			$params->{'organizer_mail'},
+			$params->{'summary'},
+			$params->{'dtstamp_conv'},
+			$params->{'uid'},
+			$params->{'sequence'},
+			$params->{'orig_invitation'}
+			);
+	}
+	else {
+		my $msg = 'Neither DTEND nor DURATION defined in a recurring event or none of: '
+			.'DTEND, DURATION, RDATE or RRULE defined.';
+		log_info $msg . ' Declining anniversary-type event or an event that takes no time.';
+
+		$params->{'attendee'}->parameters->{'PARTSTAT'} = 'DECLINED';
+		push @response_details, 'This event takes no time, so it needs no resources.';
+		push @response_details, $msg;
+		$dbh->rollback if $params->{'updating'};
+		$processed = send_mail ($params->{'event'}, $reply_sender,
+			$params->{'organizer_mail'}, 'Declined', \@response_details);
+
+		$replied_attenddees{$reply_sender} = 1;
+		$next = 1;
+	}
+	if ( $stmth ) {
+
+		$stmth->execute(@values_insert);
+		if ( $dbh->errstr ) {
+
+			$processed = process_insert_error ($params->{'event'},
+				$params->{'attendee'}, $params->{'organizer_mail'},
+				$params->{'updating'}, $reply_sender);
+			$was_err = 1;
+			$last = 1;
+		}
+	}
+	else {
+		$processed = process_insert_error ($params->{'event'},
+			$params->{'attendee'}, $params->{'organizer_mail'},
+			$params->{'updating'}, $reply_sender);
+		$was_err = 1;
+		$last = 1;
+	}
+	return ($processed, $was_err, $next, $last);
+}
+
 # ============================ val ===================================
 
 sub val ($) {
 
 	my $prop = shift;
 	return (defined ($prop)? $prop->value : '(undef)');
+}
+
+sub val_limit ($) {
+
+	my $prop = shift;
+	return (defined ($prop)? substr ($prop, 0, 1000) : undef);
 }
 
 # ============================ clean_name ===================================
