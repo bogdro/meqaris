@@ -304,8 +304,8 @@ if ( $create ) {
 	db_upgrade_print ($dbh);
 	my $stmth = db_stmt_print ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
 	$create = clean_name ($create);
-	my $rowcount = $stmth->execute (substr ($create, 0, 1000),
-		substr ($email, 0, 1000), substr ($description, 0, 1000));
+	my $rowcount = $stmth->execute (val_limit ($create),
+		val_limit ($email), val_limit ($description));
 	if ( $dbh->errstr ) {
 		my $msg = 'Database: cannot create resource: ' . $dbh->errstr;
 		log_error $msg;
@@ -450,7 +450,7 @@ if ( $update ) {
 
 		$name = clean_name($name);
 		$sql .= "r_name = \$$par_cnt";
-		push @values, substr ($name, 0, 1000);
+		push @values, val_limit ($name);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -460,7 +460,7 @@ if ( $update ) {
 			$sql .= ', ';
 		}
 		$sql .= "r_email = \$$par_cnt";
-		push @values, substr ($email, 0, 1000);
+		push @values, val_limit ($email);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -470,7 +470,7 @@ if ( $update ) {
 			$sql .= ', ';
 		}
 		$sql .= "r_description = \$$par_cnt";
-		push @values, substr ($description, 0, 1000);
+		push @values, val_limit ($description);
 		$first = 0;
 		$par_cnt++;
 	}
