@@ -989,7 +989,7 @@ for my $p (@parts) {
 							}
 							else {
 								log_info 'Old event deleted successfully.';
-								last; # go insert the new one
+								#last; # delete EVERY old event we're updating
 							}
 						}
 						else {
