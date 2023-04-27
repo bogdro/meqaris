@@ -1564,7 +1564,7 @@ sub val_limit ($) {
 sub clean_name ($) {
 
 	$name = shift;
-	$name =~ s/[^a-z0-9_.\-@\/\\#$%&*()\[\];',]/_/gi;
+	$name =~ s/[^a-z0-9_.\-@\/\\#$%&*()\[\];', ]/_/gi;
 	return $name;
 }
 
