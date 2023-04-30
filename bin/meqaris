@@ -268,7 +268,7 @@ if ( $status ) {
 		}
 	}
 	if ( ! $error ) {
-		eval 'use DBD::Pg;'; 
+		eval 'use DBD::Pg;';
 		if ($@) {
 			print 'Database connection: ', BOLD, RED, 'ERROR', RESET, ": Module DBD::Pg not installed\n";
 			$error = 2;
@@ -564,7 +564,7 @@ if ( ! db_upgrade ($dbh) ) {
 
 log_trace 'Reading configuration from the database.';
 
-my $dbcfg = $dbh->selectall_hashref (db_stmt ($dbh, 
+my $dbcfg = $dbh->selectall_hashref (db_stmt ($dbh,
 	"select c_name, c_value from meqaris.meq_config where c_name <> 'db_version'"), 'c_name');
 
 if ( ! $dbcfg ) {
@@ -610,7 +610,7 @@ my $response_type = '';
 
 log_info "New message from '$sender' with subject '$subject'.";
 
-my $res = $dbh->selectall_hashref (db_stmt ($dbh, 
+my $res = $dbh->selectall_hashref (db_stmt ($dbh,
 	'select r_id, r_name, r_email, r_enabled from meqaris.meq_resources'), 'r_email');
 if ( ! $res ) {
 
@@ -1208,7 +1208,7 @@ for my $p (@parts) {
 
 						# Get the raw e-mail address:
 						($reply_sender = val($attendee)) =~ s/^mailto://io;
-						log_trace "Deleting just for '$reply_sender'.";
+						log_trace "Deleting for '$reply_sender'.";
 						$sql .= "'" . $reply_sender . "',";
 					}
 					$sql =~ s/,$//o;
@@ -1344,14 +1344,16 @@ sub send_mail ($$$$@) {
 			$mail_command =~ s/%subject%/$response_subject/gi;
 			$mail_command =~ s/%action%/$response_type/gi;
 			log_info "Sending response to '$organizer_mail' and Cc '$sender' using command '$mail_command'";
-			open (my $cmd, '|-', $mail_command);
-			if ( ! $cmd ) {
+			if ( open (my $cmd, '|-', $mail_command) ) {
+
+				print $cmd $mail->stringify;
+				close $cmd;
+				return 1;
+			}
+			else {
 				log_warn "Mail_sending_method = mail_command, but the command failed to run: $!." .
 					' Cannot send the response.';
 			}
-			print $cmd $mail->stringify;
-			close $cmd;
-			return 1;
 		}
 		else {
 			log_warn 'Mail_sending_method = mail_command, but mail_command was not defined.' .
@@ -1370,8 +1372,7 @@ sub send_mail ($$$$@) {
 		$send_cfg{Port} = $mail_server_port if ! is_empty ($mail_server_port);
 		$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
 
-		log_info "Sending response to '$organizer_mail' and Cc '$sender' using " .
-			"mail_server:port='" .
+		log_info "Sending response to '$organizer_mail' and Cc '$sender' using mail_server:port='" .
 			(defined ($mail_server)? $mail_server : '(default)') .
 			':' . (defined ($mail_server_port)? $mail_server_port : '(default port)') ."'";
 		$mail->smtpsend(%send_cfg);
