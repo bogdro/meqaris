@@ -888,7 +888,7 @@ for my $p (@parts) {
 					# start transaction for the lock + check + DELETE + INSERT
 					$dbh->begin_work();
 					$updating = 1;
-					my $stmth = db_stmt ($dbh, 'lock table meqaris.meq_resource_reservations in access exclusive mode');
+					my $stmth = db_stmt ($dbh, 'lock table meqaris.meq_events in access exclusive mode');
 					if ( ! $stmth ) {
 						log_warn "Database: cannot lock table.\n"
 							. " Will continue, but concurrent booking of resources may give strange results.\n"
@@ -905,13 +905,16 @@ for my $p (@parts) {
 					log_trace 'Checking if an event with this UID already exists.';
 
 					# Attendee found and enabled. Check if this is an update.
+					# NOTE: we MUST check the e-mail, otherwise the same UID can cause
+					# skipping adding the same event to other resources!
 					my @values_find_del = (val ($uid), $reply_sender, defined ($dtstamp_conv)? $dtstamp_conv : undef);
 					my @old_events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems not to work
-						db_stmt ($dbh, 'select rr_id, rr_r_id, rr_organiser, coalesce (rr_seq, 0) as rr_seq, lower(rr_interval) as rr_dstart,'
-							. ' rr_dtstamp, cast (coalesce ($3, \'19700101T010101Z\') as timestamp with time zone) as new_dtstamp'
-							. ' from meqaris.meq_resource_reservations'
+						db_stmt ($dbh, 'select e_id, e_organiser, coalesce (e_seq, 0) as e_seq,'
+							. ' e_dtstamp, cast (coalesce ($3, \'19700101T010101Z\') as timestamp with time zone) as new_dtstamp'
+							. ' from meqaris.meq_events'
+							. ' join meqaris.meq_resource_reservations on rr_e_id = e_id'
 							. ' join meqaris.meq_resources on r_id = rr_r_id'
-							. ' where rr_uid = $1 and r_email = $2'),
+							. ' where e_uid = $1 and r_email = $2'),
 						{ Slice => {} }, @values_find_del) };
 					for my $old_event (@old_events) {
 
@@ -921,26 +924,26 @@ for my $p (@parts) {
 						#if ( defined ($old_event->{'rr_r_id'})
 						#	&& $res->{$reply_sender}->{'r_id'} == $old_event->{'rr_r_id'} ) {
 
-							log_debug 'Old dtstamp=' . (defined ($old_event->{'rr_dtstamp'})?
-								$old_event->{'rr_dtstamp'} : 'null');
+							log_debug 'Old dtstamp=' . (defined ($old_event->{'e_dtstamp'})?
+								$old_event->{'e_dtstamp'} : 'null');
 							log_debug 'New dtstamp=' . (defined ($old_event->{'new_dtstamp'})?
 								$old_event->{'new_dtstamp'} : 'null');
 
 							# best to compare DB strings, otherwise e.g. '2022-05-19 17:31:52+02' vs. '20220519T153152Z'
-							if ( defined ($old_event->{'rr_dtstamp'})
+							if ( defined ($old_event->{'e_dtstamp'})
 								&& defined ($old_event->{'new_dtstamp'})
-								&& $old_event->{'rr_dtstamp'} ge $old_event->{'new_dtstamp'} ) {
+								&& $old_event->{'e_dtstamp'} ge $old_event->{'new_dtstamp'} ) {
 
 								log_debug 'Same or earlier DTSTAMP - this is a re-send or a duplicate, NOT an update.' .
 									' Can be an invitation sent to multiple resources. Skipping.';
 								next EV;
 							}
 
-							log_debug 'Old seq=' . (defined ($old_event->{'rr_seq'})? $old_event->{'rr_seq'} : 'null');
+							log_debug 'Old seq=' . (defined ($old_event->{'e_seq'})? $old_event->{'e_seq'} : 'null');
 							log_debug 'New seq=' . (defined ($sequence)? val ($sequence) : 'undef');
-							if ( defined ($old_event->{'rr_seq'})
+							if ( defined ($old_event->{'e_seq'})
 								&& defined ($sequence)
-								&& int(val ($sequence)) <= $old_event->{'rr_seq'} ) {
+								&& int(val ($sequence)) <= $old_event->{'e_seq'} ) {
 
 								log_debug 'Same or earlier sequence number - this is a re-send or a duplicate, NOT an update.' .
 									' Can be an invitation sent to multiple resources. Skipping.';
@@ -963,11 +966,11 @@ for my $p (@parts) {
 							next AT;
 						}
 						log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
-						$old_event->{'rr_organiser'} =~ s/^mailto://io;
-						if ( $sender_mail ne $old_event->{'rr_organiser'} ) {
+						$old_event->{'e_organiser'} =~ s/^mailto://io;
+						if ( $sender_mail ne $old_event->{'e_organiser'} ) {
 
 							log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
-								$old_event->{'rr_organiser'} . "' - declining.";
+								$old_event->{'e_organiser'} . "' - declining.";
 							push @response_details, 'Declined for security reasons.';
 							push @response_details, 'You are not the organizer of the updated event.';
 							push @response_details, "The updated event's original organizer is '$organizer_mail'.";
@@ -978,10 +981,10 @@ for my $p (@parts) {
 						log_debug "Sender '$sender_mail' is the same organizer as in the database. Deleting old event.";
 						$dberr = undef;
 						my $stmth = db_stmt ($dbh,
-							'delete from meqaris.meq_resource_reservations ' .
-							'where rr_id = $1');
+							'delete from meqaris.meq_events ' .
+							'where e_id = $1');
 						if ( $stmth ) {
-							@values_find_del = ($old_event->{'rr_id'});
+							@values_find_del = ($old_event->{'e_id'});
 							$stmth->execute(@values_find_del);
 							if ( $dbh->errstr ) {
 
@@ -1006,6 +1009,39 @@ for my $p (@parts) {
 					} # for my $old_event (@old_events)
 					# Try to insert the new event:
 					log_info 'Inserting new event';
+					$stmth = db_stmt ($dbh,
+						'insert into meqaris.meq_events (e_organiser, e_summary, e_dtstamp, e_uid, e_seq, e_data) '
+						. 'values ($1, $2, $3, $4, $5, $6) returning e_id');
+					if ( $stmth ) {
+
+						$stmth->execute(
+							val_limit ($organizer_mail),
+							val_limit (val ($summary)),
+							$dtstamp_conv,
+							val_limit (val ($uid)),
+							(defined ($sequence))? $sequence->value : 0,
+							encode_base64 ($orig_invitation)
+						);
+						if ( $dbh->errstr ) {
+
+							$processed = process_insert_error ($event, $attendee,
+								$organizer_mail, $updating, $reply_sender);
+							next AT;
+						}
+					}
+					else {
+						$processed = process_insert_error ($event, $attendee,
+							$organizer_mail, $updating, $reply_sender);
+						next AT;
+					}
+					my $e_id = $stmth->fetch()->[0];
+					if ( ! defined ($e_id) ) {
+
+						$processed = process_insert_error ($event, $attendee,
+							$organizer_mail, $updating, $reply_sender);
+						next AT;
+					}
+
 					$stmth = undef;
 					my @values_insert = undef;
 					my $was_err = 0;
@@ -1034,18 +1070,12 @@ for my $p (@parts) {
 
 							$stmth = db_stmt ($dbh,
 								'insert into meqaris.meq_resource_reservations ' .
-								'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-								'values ($1, $2, $3, $4, $5, $6, $7, $8)');
+								'(rr_r_id, rr_interval, rr_e_id) ' .
+								'values ($1, $2, $3)');
 							@values_insert = (
 								$res->{$reply_sender}->{'r_id'},
 								'[' . $period->start . ',' . $period->end . ')',
-								val_limit ($organizer_mail),
-								val_limit (val ($summary)),
-								$dtstamp_conv,
-								val_limit (val ($uid)),
-								(defined ($sequence))? $sequence->value : 0,
-								encode_base64 ($orig_invitation)
-								);
+								$e_id);
 							if ( $stmth ) {
 
 								$stmth->execute(@values_insert);
@@ -1072,12 +1102,7 @@ for my $p (@parts) {
 								dt_start_conv => $dt_start_conv,
 								dt_end_conv => $dt_end_conv,
 								duration => $duration, # MUST pass as-is for the 'defined' test
-								organizer_mail => val_limit ($organizer_mail),
-								summary => val_limit (val ($summary)),
-								dtstamp_conv => $dtstamp_conv,
-								uid => val_limit (val ($uid)),
-								sequence => (defined ($sequence))? $sequence->value : 0,
-								orig_invitation => encode_base64 ($orig_invitation),
+								e_id => $e_id,
 								event => $event,
 								attendee => $attendee,
 								updating => $updating
@@ -1105,12 +1130,7 @@ for my $p (@parts) {
 							dt_start_conv => $dt_start_conv,
 							dt_end_conv => $dt_end_conv,
 							duration => $duration, # MUST pass as-is for the 'defined' test
-							organizer_mail => val_limit ($organizer_mail),
-							summary => val_limit (val ($summary)),
-							dtstamp_conv => $dtstamp_conv,
-							uid => val_limit (val ($uid)),
-							sequence => (defined ($sequence))? $sequence->value : 0,
-							orig_invitation => encode_base64 ($orig_invitation),
+							e_id => $e_id,
 							event => $event,
 							attendee => $attendee,
 							updating => $updating
@@ -1161,32 +1181,23 @@ for my $p (@parts) {
 			my @values_cancel = (val ($uid));
 			log_trace 'Searching the database for the event to cancel.';
 			my @events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems NOT to work
-				db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
+				db_stmt ($dbh, 'select e_id, e_organiser from meqaris.meq_events where e_uid = $1'),
 				{ Slice => {} }, @values_cancel) };
-			if (! defined ($events[0]{'rr_id'}) ) {
+			if (! defined ($events[0]{'e_id'}) ) {
 
 				log_info 'Event not found in database - ignoring.';
 				next;
 			}
 			log_trace 'Event found in the database.';
-			$events[0]{'rr_organiser'} =~ s/^mailto://io;
-			if ( $sender_mail ne $events[0]{'rr_organiser'} ) {
+			$events[0]{'e_organiser'} =~ s/^mailto://io;
+			if ( $sender_mail ne $events[0]{'e_organiser'} ) {
 
 				log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
-					$events[0]{'rr_organiser'} . "' - ignoring.";
+					$events[0]{'e_organiser'} . "' - ignoring.";
 				next;
 			}
 			log_trace 'Event sender is the organizer. Deleting the event.';
-			my $sql = 'delete from meqaris.meq_resource_reservations where rr_uid = $1';
-			@values_cancel = (val ($uid));
-			my ($recurr_id) = prop_array ($event, 'RECURRENCE-ID');
-			if ( defined ($recurr_id) ) {
-
-				log_trace 'Deleting just a RECURRENCE-ID.';
-				# add the recurrence ID of a single instance to delete
-				$sql .= ' and lower(rr_interval) = $2';
-				push @values_cancel, val ($recurr_id);
-			}
+			my $sql = '';
 			my $event_status = '';
 			if ( defined ($event->property('STATUS')) ) {
 
@@ -1194,25 +1205,43 @@ for my $p (@parts) {
 				$event_status = val ($ev_status[0]);
 				log_trace "STATUS = '$event_status'.";
 			}
-			if ( defined ($event->property('attendee'))
+			if ( $event_status eq 'CANCELLED' ) {
 				# CANCELLED status means to cancel all
-				&& !(defined ($event_status) && $event_status eq 'CANCELLED')) {
+				$sql = 'delete from meqaris.meq_events where e_uid = $1'; # foreign key cascades this
+				@values_cancel = (val ($uid));
+			}
+			else {
+				$sql = 'delete from meqaris.meq_resource_reservations where rr_e_id in '
+					. '(select e_id from meqaris.meq_events where e_uid = $1)';
+				@values_cancel = (val ($uid));
+				my ($recurr_id) = prop_array ($event, 'RECURRENCE-ID');
+				if ( defined ($recurr_id) ) {
 
-				log_trace 'Deleting just for the specified attendees.';
-				my @attendees = @{$event->property('attendee')};
-				if ( @attendees > 0 ) {
-					# Named attendees present - delete the
-					# event just for them and not for all
-					$sql .= ' and rr_r_id in (select r_id from meqaris.meq_resources where r_email in (';
-					for my $attendee (@attendees) {
+					log_trace 'Deleting just a RECURRENCE-ID.';
+					# add the recurrence ID of a single instance to delete
+					$sql .= ' and lower(rr_interval) = $2';
+					push @values_cancel, val ($recurr_id);
+				}
+				if ( defined ($event->property('attendee'))
+					# CANCELLED status means to cancel all
+					&& !(defined ($event_status) && $event_status eq 'CANCELLED')) {
 
-						# Get the raw e-mail address:
-						($reply_sender = val($attendee)) =~ s/^mailto://io;
-						log_trace "Deleting for '$reply_sender'.";
-						$sql .= "'" . $reply_sender . "',";
+					log_trace 'Deleting just for the specified attendees.';
+					my @attendees = @{$event->property('attendee')};
+					if ( @attendees > 0 ) {
+						# Named attendees present - delete the
+						# event just for them and not for all
+						$sql .= ' and rr_r_id in (select r_id from meqaris.meq_resources where r_email in (';
+						for my $attendee (@attendees) {
+
+							# Get the raw e-mail address:
+							($reply_sender = val($attendee)) =~ s/^mailto://io;
+							log_trace "Deleting for '$reply_sender'.";
+							$sql .= "'" . $reply_sender . "',";
+						}
+						$sql =~ s/,$//o;
+						$sql .= '))';
 					}
-					$sql =~ s/,$//o;
-					$sql .= '))';
 				}
 			}
 
@@ -1471,16 +1500,14 @@ sub insert_event (\%) {
 		# to each event occurrence's start
 		$stmth = db_stmt ($dbh,
 			'insert into meqaris.meq_resource_reservations ' .
-			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+			'(rr_r_id, rr_interval, rr_e_id) ' .
 			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + (cast ($4 as timestamp with time zone) - cast ($3 as timestamp with time zone))) || \')\' as tstzrange)), ' .
-			'$5, $6, $7, $8, $9, $10)');
+			'$5)');
 		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			$params->{'start_string'},
 			$params->{'dt_start_conv'},
 			$params->{'dt_end_conv'},
-			$params->{'organizer_mail'}, $params->{'summary'},
-			$params->{'dtstamp_conv'}, $params->{'uid'},
-			$params->{'sequence'}, $params->{'orig_invitation'});
+			$params->{'e_id'});
 	}
 	elsif ( defined ($params->{'dt_end_conv'}) ) {
 
@@ -1488,13 +1515,11 @@ sub insert_event (\%) {
 
 		$stmth = db_stmt ($dbh,
 			'insert into meqaris.meq_resource_reservations ' .
-			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-			'values ($1, $2, $3, $4, $5, $6, $7, $8)');
+			'(rr_r_id, rr_interval, rr_e_id) ' .
+			'values ($1, $2, $3)');
 		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			"[$params->{'dt_start_conv'}, $params->{'dt_end_conv'})",
-			$params->{'organizer_mail'}, $params->{'summary'},
-			$params->{'dtstamp_conv'}, $params->{'uid'},
-			$params->{'sequence'}, $params->{'orig_invitation'});
+			$params->{'e_id'});
 	}
 	elsif ( defined ($params->{'duration'}) ) {
 
@@ -1502,15 +1527,13 @@ sub insert_event (\%) {
 
 		$stmth = db_stmt ($dbh,
 			'insert into meqaris.meq_resource_reservations ' .
-			'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
+			'(rr_r_id, rr_interval, rr_e_id) ' .
 			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
-			'$4, $5, $6, $7, $8, $9)');
+			'$4)');
 		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			defined ($params->{'start_string'})? $params->{'start_string'} : $params->{'dt_start_conv'},
 			val ($params->{'duration'}),
-			$params->{'organizer_mail'}, $params->{'summary'},
-			$params->{'dtstamp_conv'}, $params->{'uid'},
-			$params->{'sequence'}, $params->{'orig_invitation'});
+			$params->{'e_id'});
 	}
 	else {
 		my $msg = 'Neither DTEND nor DURATION defined in a recurring event or none of: '
