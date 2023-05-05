@@ -34,9 +34,6 @@ Requirements:
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
 
-  The Log::Log4perl module should be optional, but can be of great help with
-  logging when problems occur.
-
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
 
 - a PostgreSQL database server (https://www.postgresql.org/), version 9.2
