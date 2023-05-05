@@ -91,6 +91,8 @@ Initial steps - most are one-time
 
 	service postgresql restart
 
+-----------------------------------------------------------------
+
 ------------------------
 Application installation
 ------------------------
@@ -139,6 +141,8 @@ The necessary database structures will be created by the application itself
 
 	meqaris --upgrade-db
 
+-----------------------------------------------------------------
+
 -------------------------
 Meqaris configuration
 -------------------------
@@ -165,6 +169,8 @@ Make sure that the "datadir" directory, the "log4perl_config_location" file
  and the actual log file have the right permissions so that Meqaris, which
  will run under the mail server's privileges, has the right access to all of
  those locations.
+
+-----------------------------------------------------------------
 
 -------------------------
 Mail server configuration
@@ -231,6 +237,87 @@ Restart the Postfix server (or reload its configuration) afterwards.
 
 -----------------------------------------------------------------
 
+-------------------------
+CalDAV configuration
+-------------------------
+
+Consult your CalDAV server manual about how to create users and
+ their calendars.
+
+For Cyrus IMAP (https://www.cyrusimap.org/), you add users and passwords to
+ the authentication mechanism and then create mailboxes in Cyrus IMAP.
+
+Start with reading the Cyrus IMAP installation procedure:
+ https://www.cyrusimap.org/imap/installing.html
+
+After Cyrus IMAP installation, begin by starting the authentication
+ mechanism (as root):
+
+	systemctl start saslauthd
+or
+	saslauthd -a sasldb start
+
+Assuming you want a "room1" alias and everything is installed in the default
+ paths, you add the user and password (as root):
+
+	echo 'room1s-password' | saslpasswd2 -p -c room1
+
+Next, make sure the "httpmodules" line in your imapd.conf file contains
+ "caldav", like this:
+
+	httpmodules: caldav carddav
+
+Check that the SERVICES section in your cyrus.conf file contains at least
+ an enabled "http" service (it can also contain "https"):
+
+	SERVICES {
+		...
+		http          cmd="httpd" listen="http" prefork=0
+
+Non-standard paths require passing the location of the imapd.conf file:
+
+	SERVICES {
+		...
+		http cmd="httpd -C /path/to/imapd.conf" listen="http" prefork=0
+
+Start Cyrus IMAP by starting the appropriate service or by running
+ just (as root):
+
+	master
+
+ (if you installed locally)
+
+You may need to pass paths to the configuration files:
+
+	/path/to/master -C /path/to/imapd.conf -M /path/to/cyrus.conf -d
+
+To create a user mailbox for the user "room1" in Cyrus IMAP, assuming default
+ paths and that the Cyrus IMAP administration user is called "cyrus" (with
+ the password "cyrus"), run (as root):
+
+	echo 'createmailbox user/room1@localhost' | cyradm -u cyrus -w cyrus localhost
+
+The address of the user's calendar is
+ http://localhost/dav/principals/user/room1@localhost/, which gets translated
+ into http://localhost/dav/calendars/user/room1/Default/.
+
+Unless configured otherwise, the calendar requires authentication - you use
+ the username and password passed to the "saslpasswd2" command earlier.
+
+After first access to the URL, the calendar should be created.
+
+This is the URL you will be passing to Meqaris later.
+
+You can use your browser to create, manage and download the user's calendar by
+ visiting http://localhost/dav/calendars/user/room1/ and authenticating as
+ the user.
+
+More information can be found on the Cyrus IMAP CalDAV page:
+ https://www.cyrusimap.org/imap/download/installation/http/caldav.html
+
+-----------------------------------------------------------------
+
+--------------
 Uninstallation
 --------------
 

@@ -36,6 +36,7 @@
    <li>DBI,</li>
    <li>Fcntl,</li>
    <li>Getopt::Long,</li>
+   <li>HTTP::DAV,</li>
    <li>Log::Log4perl,</li>
    <li>MIME::Base64,</li>
    <li>MIME::Parser,</li>
@@ -46,10 +47,6 @@
   DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
-  </p>
-  <p>
-  The Log::Log4perl module should be optional, but can be of great help with logging
-  when problems occur.
   </p>
   <p>
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
@@ -308,6 +305,90 @@ For a password-less, local-only mail submission, add this to your
 	smtpd_tls_security_level = </pre>
 <p>
 Restart the Postfix server (or reload its configuration) afterwards.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
+<h2 class="c">CalDAV configuration</h2>
+
+<p>
+Consult your CalDAV server manual about how to create users and their calendars.
+</p>
+<p>
+For <a href="https://www.cyrusimap.org/" hreflang="en">Cyrus IMAP</a>,
+you add users and passwords to the authentication mechanism and then
+create mailboxes in Cyrus IMAP.
+</p>
+<p>
+Start with reading the <a href="https://www.cyrusimap.org/imap/installing.html"
+hreflang="en">Cyrus IMAP installation procedure</a>.
+</p>
+<p>
+After Cyrus IMAP installation, begin by starting the authentication
+mechanism (as <code>root</code>):
+</p>
+<pre>	systemctl start saslauthd</pre>
+<p>or</p>
+<pre>	saslauthd -a sasldb start</pre>
+
+<p>
+Assuming you want a "room1" alias and everything is installed in the default
+paths, you add the user and password (as <code>root</code>):
+</p>
+<pre>	echo 'room1s-password' | saslpasswd2 -p -c room1</pre>
+
+<p>
+Next, make sure the <code>httpmodules</code> line in your <code>imapd.conf</code>
+file contains <code>caldav</code>, like this:
+</p>
+<pre>	httpmodules: caldav carddav</pre>
+<p>
+Check that the <code>SERVICES</code> section in your <code>cyrus.conf</code>
+file contains at least an enabled <code>http</code> service (it can also contain <code>https</code>):
+</p>
+<pre>
+	SERVICES {
+		...
+		http          cmd="httpd" listen="http" prefork=0</pre>
+<p>
+Non-standard paths require passing the location of the <code>imapd.conf</code> file:
+</p>
+<pre>
+	SERVICES {
+		...
+		http          cmd="httpd -C /path/to/imapd.conf" listen="http" prefork=0</pre>
+<p>
+Start Cyrus IMAP by starting the appropriate service or by running just (as <code>root</code>):
+</p>
+<pre>	master</pre>
+(if you installed locally)
+<p>
+You may need to pass paths to the configuration files:
+</p>
+<pre>	/path/to/master -C /path/to/imapd.conf -M /path/to/cyrus.conf -d</pre>
+<p>
+To create a user mailbox for the user "room1" in Cyrus IMAP,
+assuming default paths and that the Cyrus IMAP administration user is called <code>cyrus</code> (with
+the password "cyrus"), run (as <code>root</code>):
+</p>
+<pre>	echo 'createmailbox user/room1@localhost' | cyradm -u cyrus -w cyrus localhost</pre>
+<p>
+The address of the user's calendar is <code>http://localhost/dav/principals/user/room1@localhost/</code>,
+which gets translated into <code>http://localhost/dav/calendars/user/room1/Default/</code>.<br>
+Unless configured otherwise, the calendar requires authentication - you use the
+username and password passed to the <code>saslpasswd2</code> command earlier.<br>
+After first access to the URL, the calendar should be created.<br>
+<em class="important">This is the URL you will be passing to Meqaris later</em>.
+</p>
+<p>
+You can use your browser to create, manage and download the user's calendar by
+visiting http://localhost/dav/calendars/user/room1/ and authenticating as the user.
+</p>
+<p>
+More information can be found on the <a
+href="https://www.cyrusimap.org/imap/download/installation/http/caldav.html"
+hreflang="en">Cyrus IMAP CalDAV page</a>.
 </p>
 
 <!-- ############################################################ -->

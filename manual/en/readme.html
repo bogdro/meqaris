@@ -54,6 +54,7 @@ picture projectors, conference sets or anything else you need.
    <li>DBI,</li>
    <li>Fcntl,</li>
    <li>Getopt::Long,</li>
+   <li>HTTP::DAV,</li>
    <li>Log::Log4perl,</li>
    <li>MIME::Base64,</li>
    <li>MIME::Parser,</li>
@@ -64,10 +65,6 @@ picture projectors, conference sets or anything else you need.
   DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
-  </p>
-  <p>
-  The Log::Log4perl module should be optional, but can be of great help with logging
-  when problems occur.
   </p>
   <p>
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
@@ -98,15 +95,25 @@ components in the following versions:
 <ol>
  <li><a href="https://www.postgresql.org/" hreflang="en">PostgreSQL</a>:
   <ul>
+	<li>11.x (checked: 11.18), with an extra installation step</li>
+	<li>12.x (checked: 12.13), with an extra installation step</li>
+	<li>13.x (checked: 13.9)</li>
 	<li>14.x (checked: 14.1)</li>
+	<li>15.x (checked: 15.1)</li>
   </ul></li>
  <li><a href="https://www.perl.org/" hreflang="en">Perl</a>:
   <ul>
+	<li>v5.20.3</li>
 	<li>v5.34.0</li>
   </ul></li>
  <li><a href="https://www.postfix.org/" hreflang="en">Postfix</a>:
   <ul>
 	<li>3.6.5</li>
+  </ul></li>
+ <li><a href="https://www.cyrusimap.org/" hreflang="en">Cyrus IMAP</a>
+	(<a href="https://en.wikipedia.org/wiki/CalDAV" hreflang="en">CalDAV</a> module):
+  <ul>
+	<li>3.6.0</li>
   </ul></li>
 </ol>
 <p>Other versions may also work.</p>
@@ -182,7 +189,7 @@ Any improvement suggestions can be reported by e-mail or in the
 
 <p>To report usage problems, include:</p>
 <ol>
-	<li>the Meqaris version you're using, e.g. <code>Meqaris 1.0</code>,</li>
+	<li>the Meqaris version you're using, e.g. <code>Meqaris 1.4</code>,</li>
 	<li>the PostgreSQL version you're using, e.g. <code>PostgreSQL 14.1</code>,</li>
 	<li>the Perl version you're using, e.g. the output of <code>perl --version</code>:
 		<pre>	This is perl 5, version 34, subversion 0 (v5.34.0) built for x86_64-linux-thread-multi</pre></li>

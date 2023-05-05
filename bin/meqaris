@@ -32,6 +32,7 @@ use DateTime::TimeZone::ICal;
 use DBI;
 use Fcntl;				# core
 use Getopt::Long;			# core
+use HTTP::DAV;
 use MIME::Base64 qw(encode_base64);	# core
 use MIME::Parser;
 use Term::ANSIColor qw(:constants);	# core (5.6.0)
@@ -68,10 +69,11 @@ eval {
 # ============================ Command line processing =======================
 
 sub send_mail ($$$$@);
-sub send_accept ($$$$$$);
+sub send_accept ($$$$$$$);
 sub send_decline ($$$$$$);
 sub process_insert_error ($$$$$);
 sub insert_event (\%);
+sub notify_caldav ($$$$$);
 sub val ($);
 sub val_limit ($);
 sub clean_name ($);
@@ -91,9 +93,13 @@ log_trace 'Reading the command line.';
 
 Getopt::Long::Configure('ignore_case', 'ignore_case_always');
 
+my $add_caldav_resource = '';
+my $add_caldav_server = '';
 my $config_file = '/etc/meqaris.ini';
 my $create = '';
 my $delete = '';
+my $delete_caldav_resource = '';
+my $delete_caldav_server = '';
 my $description = '';
 my $destroy_db = '';
 my $disable = '';
@@ -102,31 +108,45 @@ my $enable = '';
 my $help = '';
 my $lic = '';
 my $name = '';
+my $password = '';
+my $realm = '';
 my $set = '';
 my $status = '';
 my $update = '';
+my $update_caldav_server = '';
 my $upgrade_db = '';
+my $user = '';
+my $url = '';
 my $value = undef;
 my $version = '';
 
 if ( !GetOptions (
-	'conf=s'		=> \$config_file,
-	'create=s'		=> \$create,
-	'delete=s'		=> \$delete,
-	'description=s'		=> \$description,
-	'destroy-db'		=> \$destroy_db,
-	'disable=s'		=> \$disable,
-	'email=s'		=> \$email,
-	'enable=s'		=> \$enable,
-	'h|help|?'		=> \$help,
-	'license|licence'	=> \$lic,
-	'name=s'		=> \$name,
-	'set=s'			=> \$set,
-	'status'		=> \$status,
-	'update=s'		=> \$update,
-	'upgrade-db'		=> \$upgrade_db,
-	'value=s'		=> \$value,
-	'version'		=> \$version,
+	'add-caldav-resource=s'		=> \$add_caldav_resource,
+	'add-caldav-server=s'		=> \$add_caldav_server,
+	'conf=s'			=> \$config_file,
+	'create=s'			=> \$create,
+	'delete=s'			=> \$delete,
+	'delete-caldav-resource=s'	=> \$delete_caldav_resource,
+	'delete-caldav-server=s'	=> \$delete_caldav_server,
+	'description=s'			=> \$description,
+	'destroy-db'			=> \$destroy_db,
+	'disable=s'			=> \$disable,
+	'email=s'			=> \$email,
+	'enable=s'			=> \$enable,
+	'h|help|?'			=> \$help,
+	'license|licence'		=> \$lic,
+	'name=s'			=> \$name,
+	'password=s'			=> \$password,
+	'realm=s'			=> \$realm,
+	'set=s'				=> \$set,
+	'status'			=> \$status,
+	'update=s'			=> \$update,
+	'update-caldav-server=s'	=> \$update_caldav_server,
+	'upgrade-db'			=> \$upgrade_db,
+	'url=s'				=> \$url,
+	'user=s'			=> \$user,
+	'value=s'			=> \$value,
+	'version'			=> \$version,
 	)
    ) {
 	print_help();
@@ -298,6 +318,71 @@ if ( $status ) {
 	exit $error;
 }
 
+if ( $add_caldav_resource ) {
+
+	log_info "Command line: --add-caldav-resource: res_name='$name', server_name='$add_caldav_resource'";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'insert into meqaris.meq_caldav_servers_resources (calres_cals_id, calres_r_id) '
+		. 'select (select cals_id from meqaris.meq_caldav_servers where cals_name = $1), '
+		. '(select r_id from meqaris.meq_resources where r_name = $2)');
+	my $rowcount = $stmth->execute ($add_caldav_resource, $name);
+	if ( $dbh->errstr ) {
+		my $msg = 'Database: cannot add CalDAV resource: ' . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = 'Database: cannot add CalDAV resource (unknown error).';
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	my $msg = "Resource '$name' successfully added to CalDAV server '$add_caldav_resource'.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $add_caldav_server ) {
+
+	log_info "Command line: --add-caldav-server: name='$name', url='$add_caldav_server', user='$user', realm='$realm'";
+	if ( is_empty($name) or is_empty($add_caldav_server) ) {
+
+		my $msg = 'Name and URL are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'insert into meqaris.meq_caldav_servers (cals_name, cals_url, cals_username, cals_password, cals_realm) '
+		. 'values ($1, $2, $3, $4, $5)');
+	my $rowcount = $stmth->execute ($name, $add_caldav_server, $user, $password, $realm);
+	if ( $dbh->errstr ) {
+		my $msg = 'Database: cannot add CalDAV server: ' . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = 'Database: cannot add CalDAV server (unknown error).';
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	my $msg = "CalDAV server '$name' added successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
 if ( $create ) {
 
 	log_info "Command line: --create: name='$create' email='$email' desc='$description'";
@@ -350,6 +435,62 @@ if ( $delete ) {
 	}
 	$dbh->disconnect;
 	my $msg = "Resource '$delete' deleted successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $delete_caldav_resource ) {
+
+	log_info "Command line: --delete-caldav-resource: res_name='$name', server_name='$delete_caldav_resource'";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'delete from meqaris.meq_caldav_servers_resources where '
+		. 'calres_cals_id = (select cals_id from meqaris.meq_caldav_servers where cals_name = $1) '
+		. 'and calres_r_id = (select r_id from meqaris.meq_resources where r_name = $2)');
+	my $rowcount = $stmth->execute ($delete_caldav_resource, $name);
+	if ( $dbh->errstr ) {
+		my $msg = 'Database: cannot unassign CalDAV resource: ' . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = 'Database: cannot unassign CalDAV resource - not found.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	my $msg = "Resource '$name' successfully unassigned from CalDAV server '$delete_caldav_resource'.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $delete_caldav_server ) {
+
+	log_info "Command line: --delete-caldav-server: name='$delete_caldav_server'";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'delete from meqaris.meq_caldav_servers where cals_name = $1');
+	my $rowcount = $stmth->execute ($delete_caldav_server);
+	if ( $dbh->errstr ) {
+		my $msg = 'Database: cannot delete CalDAV server: ' . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = 'Database: cannot delete CalDAV server - not found.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	my $msg = "CalDAV server '$delete_caldav_server' deleted successfully.";
 	log_info $msg;
 	print $msg . "\n";
 	exit 0;
@@ -495,6 +636,102 @@ if ( $update ) {
 	}
 	$dbh->disconnect;
 	my $msg = "Resource '$update' updated successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $update_caldav_server ) {
+
+	log_info "Command line: --update-caldav-server: name='"
+		. ((defined $update_caldav_server)? $update_caldav_server : 'undef') . "', new_name='"
+		. ((defined $name)? $name : 'undef') . "', user='"
+		. ((defined $user)? $user : 'undef') . "', realm='"
+		. ((defined $realm)? $realm : 'undef') . "', url='"
+		. ((defined $url)? $url : 'undef') . "'";
+	if ( is_empty($name) and is_empty($url) and is_empty($user) and is_empty($password) and is_empty($realm) ) {
+
+		my $msg = 'None of the new parameters (name, URL, username, password, realm) have been provided.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $sql = 'update meqaris.meq_caldav_servers set ';
+	my $first = 1;
+	my $par_cnt = 2;
+	my @values = ($update_caldav_server);
+	if ( !is_empty ($name) ) {
+
+		$name = clean_name($name);
+		$sql .= "cals_name = \$$par_cnt";
+		push @values, val_limit ($name);
+		$first = 0;
+		$par_cnt++;
+	}
+	if ( defined ($url) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_url = \$$par_cnt";
+		push @values, val_limit ($url);
+		$first = 0;
+		$par_cnt++;
+	}
+	if ( defined ($user) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_username = \$$par_cnt";
+		push @values, val_limit ($user);
+		$first = 0;
+		$par_cnt++;
+	}
+
+	if ( defined ($password) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_password = \$$par_cnt";
+		push @values, val_limit ($password);
+		$first = 0;
+		$par_cnt++;
+	}
+
+	if ( defined ($realm) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_realm = \$$par_cnt";
+		push @values, val_limit ($realm);
+		$first = 0;
+		$par_cnt++;
+	}
+
+	$sql .= ' where cals_name = $1';
+
+	my $stmth = db_stmt_print ($dbh, $sql);
+	my $rowcount = $stmth->execute (@values);
+	if ( $dbh->errstr ) {
+		my $msg = 'Database: cannot update CalDAV server: ' . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = 'Database: cannot update CalDAV server - not found.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	my $msg = "CalDAV server '$update_caldav_server' updated successfully.";
 	log_info $msg;
 	print $msg . "\n";
 	exit 0;
@@ -1119,7 +1356,7 @@ for my $p (@parts) {
 
 							log_info "Inserted recurring event for attendee '$reply_sender'.";
 							$processed = send_accept ($event, $attendee, $organizer_mail,
-								$updating, $reply_sender, \@response_details);
+								$updating, $reply_sender, \@response_details, val ($uid));
 						}
 						# NOTE: recurring event inserted - do not proceed with the normal!
 						next AT;
@@ -1142,7 +1379,7 @@ for my $p (@parts) {
 
 						log_info "Inserted for attendee '$reply_sender'.";
 						$processed = send_accept ($event, $attendee, $organizer_mail,
-							$updating, $reply_sender, \@response_details);
+							$updating, $reply_sender, \@response_details, val ($uid));
 						next AT;
 					}
 				}
@@ -1199,12 +1436,22 @@ for my $p (@parts) {
 			log_trace 'Event sender is the organizer. Deleting the event.';
 			my $sql = '';
 			my $event_status = '';
+			my ($recurr_id) = prop_array ($event, 'RECURRENCE-ID');
 			if ( defined ($event->property('STATUS')) ) {
 
 				my @ev_status = prop_array($event, 'STATUS');
 				$event_status = val ($ev_status[0]);
 				log_trace "STATUS = '$event_status'.";
 			}
+			log_trace 'CalDAV: reading servers by UID for deleting.';
+			my $caldav_servers = $dbh->selectall_arrayref (db_stmt ($dbh,
+				'select distinct cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers '
+				. 'join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id '
+				. 'join meqaris.meq_resources on r_id = calres_r_id '
+				. 'join meqaris.meq_resource_reservations on rr_r_id = r_id '
+				. 'join meqaris.meq_events on e_id = rr_e_id '
+				. 'where e_uid = $1'
+				), { Slice => {} }, (val ($uid)));
 			if ( $event_status eq 'CANCELLED' ) {
 				# CANCELLED status means to cancel all
 				$sql = 'delete from meqaris.meq_events where e_uid = $1'; # foreign key cascades this
@@ -1214,7 +1461,6 @@ for my $p (@parts) {
 				$sql = 'delete from meqaris.meq_resource_reservations where rr_e_id in '
 					. '(select e_id from meqaris.meq_events where e_uid = $1)';
 				@values_cancel = (val ($uid));
-				my ($recurr_id) = prop_array ($event, 'RECURRENCE-ID');
 				if ( defined ($recurr_id) ) {
 
 					log_trace 'Deleting just a RECURRENCE-ID.';
@@ -1249,16 +1495,101 @@ for my $p (@parts) {
 			if ( $stmth ) {
 				$stmth->execute(@values_cancel);
 				if ( $dbh->errstr ) {
-					log_error "Error deleting event:\n" .
+					log_error "Error deleting event from the database:\n" .
 						$dbh->errstr;
 				}
 				else {
-					log_info 'Event deleted successfully.';
+					log_info 'Event deleted successfully from the database.';
+					# notify CalDAV
+					if ( $event_status eq 'CANCELLED' ) {
+						log_trace 'Deleting the whole event from CalDAV.';
+						notify_caldav ('DEL', $event, undef,
+							val ($uid), $caldav_servers);
+					}
+					else {
+						# partial delete
+						if ( defined ($event->property('attendee')) ) {
+							my @attendees = @{$event->property('attendee')};
+							if ( @attendees > 0 ) {
+								# Named attendees present - delete the
+								# event just for them and not for all
+								for my $attendee (@attendees) {
+
+									# Get the raw e-mail address:
+									($reply_sender = val($attendee)) =~ s/^mailto://io;
+									log_trace "Deleting from CalDAV for '$reply_sender'.";
+									if ( ! defined ($recurr_id) ) {
+										notify_caldav ('DEL', $event,
+											$reply_sender, val ($uid),
+											$caldav_servers);
+									}
+									else {
+										# Delete just the occurrence.
+										# NOTE: sending an iCalendar with METHOD:CANCEL
+										# doesn't work, so we simply add an EXDATE
+										if ( ! defined ($event->property('EXDATE')) ) {
+
+											my $tzid_recurr = $recurr_id->parameters->{'TZID'};
+											if ( defined ($tzid_recurr) ) {
+												$event->add_property( 'EXDATE' => [
+													val ($recurr_id),
+													{ 'TZID' => $tzid_recurr } ] );
+											}
+											else {
+												$event->add_property('EXDATE', val ($recurr_id));
+											}
+										}
+										else {
+											my @new_values = ();
+											my $exd_values = $event->property('EXDATE')->[0]->value;
+											if ( ref $exd_values ) {
+												@new_values = @{$exd_values};
+											}
+											else {
+												push @new_values, $exd_values;
+											}
+											my $recurr_val = val ($recurr_id);
+											push @new_values, $recurr_val;
+											# fixed later, in notify_caldav()
+											$event->property('EXDATE')->[0]->value(
+												join ',', @new_values);
+										}
+										#undef($event->properties->{'RECURRENCE-ID'});
+										#undef($event->properties->{'RECURRENCE-ID'}->[0]);
+										# remove RECURRENCE-ID - works only this way:
+										my $ical_str = $ical->as_string;
+										$ical_str =~ s/RECURRENCE-ID.*[\r\n]+//o;
+										my $del_ical = Data::ICal->new(
+											rfc_strict => 1, data => $ical_str);
+										for my $entry (@{$del_ical->entries}) {
+
+											my $type = $entry->ical_entry_type;
+											if ( $type eq 'VEVENT' ) {
+
+												my ($caldav_ret, undef)
+													= notify_caldav ('PUT', $entry,
+														$reply_sender, val ($uid),
+														$caldav_servers);
+												last;
+											}
+										}
+									}
+								}
+							}
+							else {
+								log_info 'Attendees empty - deleting the whole event from CalDAV.';
+								notify_caldav ('DEL', $event, undef, val ($uid), $caldav_servers);
+							}
+						}
+						else {
+							log_info 'Attendees not defined - deleting the whole event from CalDAV.';
+							notify_caldav ('DEL', $event, undef, val ($uid), $caldav_servers);
+						}
+					}
 				}
 			}
 			else {
-				log_error "Error deleting event:\n" .
-					$dbh->errstr;
+				log_error "Error deleting event from the database:\n" . $dbh->errstr;
 			}
 		} # 'CANCEL'
 	} # event loop
@@ -1289,9 +1620,13 @@ sub print_help {
 			"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
 			"Syntax: meqaris [options]\n\n" .
 			"Options:\n" .
+			"--add-caldav-resource <caldav_server_name>\tAssign the given CalDAV server to the resource given in --name\n" .
+			"--add-caldav-server <URL>\tAdd a CalDAV server with --name and optional --user, --password and --realm\n" .
 			"--conf <file>\t\t\tUse the given configuration file\n" .
 			"--create <name>\t\t\tCreate a new meeting resource\n" .
 			"--delete <name>\t\t\tDelete a meeting resource with the given name\n" .
+			"--delete-caldav-resource <caldav_server_name>\tUn-assign the given CalDAV server from the resource given in --name\n" .
+			"--delete-caldav-server <caldav_server_name>\tDelete the CalDAV server with the given name\n" .
 			"--description <desc>\t\tSpecifies a description for a meeting resource when creating or updating\n" .
 			"--destroy-db\t\t\tDestroys the Meqaris schema on the database\n" .
 			"--disable <name>\t\tDisables the meeting resource with the given name\n" .
@@ -1299,11 +1634,16 @@ sub print_help {
 			"--enable <name>\t\t\tEnables the meeting resource with the given name\n" .
 			"-h|--help|-?\t\t\tShows this help message\n" .
 			"--license|licence\t\tShows the license information\n" .
-			"--name <name>\t\t\tSpecifies a new name for the meeting resource when updating\n" .
+			"--name <name>\t\t\tSpecifies a name for the meeting resource or CalDAV server\n" .
+			"--password <password>\t\tSpecifies a password when creating or updating a CalDAV server\n" .
+			"--realm <realm_name>\t\tSpecifies a realm when creating or updating a CalDAV server\n" .
 			"--set <name>\t\t\tSpecifies the name of the configuration setting to modify\n" .
 			"--status\t\t\tShows the operability status of Meqaris\n" .
 			"--update <name>\t\t\tUpdate a meeting resource with the given name\n" .
+			"--update-caldav-server <caldav_server_name>\tUpdate a CalDAV server with a new --url / --name / --user / --password / --realm\n" .
 			"--upgrade-db\t\t\tRun the necessary Meqaris database structure upgrade scripts\n" .
+			"--url <URL>\t\t\tSpecifies an URL for the CalDAV server when updating\n" .
+			"--user <username>\t\tSpecifies a username when creating or updating a CalDAV server\n" .
 			"--value <value>\t\t\tSpecifies the new value of the configuration setting to modify using --set\n" .
 			"--version\t\t\tDisplay Meqaris version information\n"
 		;
@@ -1412,7 +1752,7 @@ sub send_mail ($$$$@) {
 
 # ============================ send_accept ===================================
 
-sub send_accept ($$$$$$) {
+sub send_accept ($$$$$$$) {
 
 	my $event = shift;
 	my $attendee = shift;
@@ -1420,9 +1760,13 @@ sub send_accept ($$$$$$) {
 	my $updating = shift;
 	my $reply_sender = shift;
 	my $response_details = shift;
+	my $uid = shift;
 
 	$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
 	$dbh->commit if $updating;
+	my ($caldav_ret, $caldav_response_details)
+		= notify_caldav ('PUT', $event, $reply_sender, $uid, undef);
+	push @{$response_details}, @{$caldav_response_details} if $caldav_ret != 1;
 	my $processed = send_mail ($event, $reply_sender,
 		$organizer_mail, 'Accepted', $response_details);
 
@@ -1567,6 +1911,152 @@ sub insert_event (\%) {
 		$last = 1;
 	}
 	return ($processed, $was_err, $next, $last);
+}
+
+# ============================ notify_caldav ===================================
+
+sub notify_caldav ($$$$$) {
+
+	my $type = shift;
+	my $event = shift;
+	my $reply_sender = shift;
+	my $uid = shift;
+	my $caldav_servers = shift;
+
+	my @response_details = ();
+	my $result = 0;
+	my $ret = 0;
+
+	log_trace 'CalDAV: notifying servers.';
+	# Send the whole event to CalDAV servers for the resource
+	my $err_msg = 'CalDAV: Some servers could not have been notified.';
+	my $stmth;
+	my @stmt_params = ();
+	if ( defined ($reply_sender) ) { # add/delete by resource
+
+		log_debug "CalDAV: resource defined: '$reply_sender'.";
+		$stmth = db_stmt ($dbh,
+			'select cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers '
+			. 'join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id '
+			. 'join meqaris.meq_resources on r_id = calres_r_id '
+			. 'where r_email = $1'
+			);
+		push @stmt_params, $reply_sender;
+		log_trace 'CalDAV: reading servers.';
+		$caldav_servers = $dbh->selectall_arrayref ($stmth,
+			{ Slice => {} }, @stmt_params);
+		if ( $dbh->errstr ) {
+
+			log_warn $err_msg . " Database error:\n" . $dbh->errstr;
+			push @response_details, $err_msg;
+			push @response_details, 'Cannot read CalDAV servers connected to the resource.';
+			push @response_details, "Database error:\n" . $dbh->errstr;
+		}
+	}
+	if ( defined ($caldav_servers) ) {
+
+		log_trace 'CalDAV: got list of servers. Length: ' . (scalar @{$caldav_servers});
+		my $caldav_entry = Data::ICal->new (rfc_strict => 1);
+		$caldav_entry->add_property('METHOD', 'REQUEST'); # even for deleting single occurrences
+		$caldav_entry->add_entry ($event);
+		my $caldav_string = $caldav_entry->as_string;
+		# Need to have just one EXDATE (for compatibility), but
+		# Data::ICal::Property->value() accepts only 1 value and
+		# escapes any commas inside, so remove escape backslashes
+		# from EXDATE - works only this way. Some CalDAV servers
+		# turn it into separate entries anyway, which defeats the
+		# purpose (we can do this ourselves), but at least we do what we can:
+		while ($caldav_string =~ /(EXDATE.*)\\,(.*[\r\n]+)/o) {
+			$caldav_string =~ s/(EXDATE.*)\\,(.*[\r\n]+)/$1,$2/;
+		}
+		log_debug "CalDAV: will send this iCalendar:\n" . $caldav_string;
+		for my $server (@{$caldav_servers}) {
+
+			my $conn = HTTP::DAV->new();
+			if (! is_empty ($server->{'cals_username'})
+				&& ! is_empty ($server->{'cals_password'})
+				&& ! is_empty ($server->{'cals_realm'})
+			) {
+				log_trace "CalDAV: Using user='$server->{'cals_username'}' and realm='$server->{'cals_realm'}'.";
+				$conn->credentials(
+					-user  => $server->{'cals_username'},
+					-pass  => $server->{'cals_password'},
+					-realm => $server->{'cals_realm'},
+					-url   => $server->{'cals_url'}
+					);
+			}
+			elsif (! is_empty ($server->{'cals_username'})
+				&& ! is_empty ($server->{'cals_password'})
+			) {
+				log_trace "CalDAV: Using user='$server->{'cals_username'}'.";
+				$conn->credentials(
+					-user  => $server->{'cals_username'},
+					-pass  => $server->{'cals_password'},
+					-url   => $server->{'cals_url'}
+					);
+			}
+			else {
+				log_trace 'CalDAV: Using just the URL.';
+				$conn->credentials(-url => $server->{'cals_url'});
+			}
+			log_debug "CalDAV: Opening URL: '$server->{'cals_url'}'.";
+			if (! $conn->open (-url => $server->{'cals_url'})) {
+
+				log_warn $err_msg . " Cannot connect to CalDAV server '$server->{'cals_url'}'."
+					. " CalDAV error:\n" . $conn->message;
+				push @response_details, $err_msg;
+				push @response_details, "Cannot connect to CalDAV server '$server->{'cals_url'}'.";
+				push @response_details, "CalDAV error:\n" . $conn->message;
+				next;
+			}
+			if ( $type eq 'PUT' ) {
+
+				log_trace "CalDAV: Using PUT.";
+				$result = $conn->put(-local => \$caldav_string, -url => $server->{'cals_url'} . '/' . $uid . '.ics');
+			}
+			elsif ( $type eq 'DEL' ) {
+
+				log_trace "CalDAV: Using DELETE.";
+				$result = $conn->delete(-url => $server->{'cals_url'} . '/' . $uid . '.ics');
+			}
+			if (! $result) {
+
+				log_warn $err_msg . " Cannot send/delete data to/from CalDAV server '$server->{'cals_url'}'."
+					. " CalDAV error:\n" . $conn->message;
+				push @response_details, $err_msg;
+				push @response_details, "Cannot send/delete data to/from CalDAV server '$server->{'cals_url'}'.";
+				push @response_details, "CalDAV error:\n" . $conn->message;
+				my $add_details = '';
+				my $response = $conn->get_last_response();
+				if ( $response->is_multistatus() ) {
+
+					for (my $i = 0; $i < $response->response_count(); $i++) {
+
+						my ($err_code, $dav_err_msg, $url, $desc)
+							= $response->response_bynum($i);
+						$add_details .= "$url: $err_code: $dav_err_msg\n";
+					}
+				}
+				else {
+					$add_details .= $response->as_string() . "\n";
+				}
+				my $msg = "CalDAV messages:\n" . $add_details;
+				log_warn $msg;
+				push @response_details, $msg;
+			}
+			else {
+				log_trace "CalDAV: Success.";
+				$ret = 1;
+			}
+		}
+	}
+	else {
+		log_warn $err_msg . " Database error:\n" . $dbh->errstr;
+		push @response_details, $err_msg;
+		push @response_details, 'Cannot read CalDAV servers connected to the resource.';
+		push @response_details, "Database error:\n" . $dbh->errstr;
+	}
+	return ($ret, \@response_details);
 }
 
 # ============================ val ===================================

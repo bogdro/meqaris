@@ -168,6 +168,59 @@ the same as an empty string), run just
 	<pre>	meqaris --set &lt;name&gt;</pre>
 
 <p>
+To use <a href="https://en.wikipedia.org/wiki/CalDAV" hreflang="en">CalDAV</a>
+with Meqaris, you begin by adding CalDAV servers (calendar locations).
+To do that, use the <code>--add-caldav-server</code> parameter
+(and remember to properly quote or escape the parameters):
+</p>
+<pre>	meqaris --add-caldav-server 'http://some-url/some/calendar/location'
+		--name 'Some CalDAV server'</pre>
+
+<p>
+The URL (after the <code>--add-caldav-server</code> parameter) and name are required.
+If the server requires authentication, you can pass the <code>--user</code>,
+<code>--password</code> and <code>--realm</code> (if needed) parameters:
+</p>
+<pre>	meqaris --add-caldav-server 'http://some-url'
+		--name 'Some CalDAV server'
+		--user some-user --password users-password</pre>
+
+<p>
+To later modify the server, if needed, use the <code>--update-caldav-server</code> parameter,
+passing the name of the server to modify and the new values:
+</p>
+<pre>
+	meqaris --update-caldav-server 'CalDAV1'
+		--name 'CalDAV2'
+		--url 'http://caldav2/some/calendar/location'
+		--user caldav2-user
+		--password 'caldav2-password'
+		--realm caldav2</pre>
+
+<p>
+Once CalDAV servers are added, you can assign resources to them so that Meqaris
+knows which servers to notify when an invitation for a particular resource is
+processed.
+</p>
+<p>
+To assign an existing resource to a CalDAV server, use the <code>--add-caldav-resource</code> parameter:
+</p>
+<pre>	meqaris --add-caldav-resource 'Some CalDAV server'
+		--name 'Resource name'</pre>
+<p>
+You can assign multiple CalDAV servers to one resource and multiple resources to one CalDAV server.
+</p>
+<p>
+To un-assign an existing resource from a CalDAV server, use the <code>--delete-caldav-resource</code> parameter:
+</p>
+<pre>	meqaris --delete-caldav-resource 'Some CalDAV server'
+		--name 'Resource name'</pre>
+<p>
+To delete a CalDAV server and un-assign all existing resources from it, use the <code>--delete-caldav-server</code> parameter:
+</p>
+<pre>	meqaris --delete-caldav-server 'Some CalDAV server'</pre>
+
+<p>
 To completely delete the Meqaris data and database structures in the
 database, run
 </p>
@@ -402,8 +455,15 @@ Currently, the following user-modifiable parameters are supported:
 	  and examine the output,</li>
 	 <li>check the Meqaris' logs for more information. Increase the logging level
 	  if necessary.</li>
-	 </ul>
-	 </li>
+	</ul>
+	</li>
+ <li>Excluding more than one date in CalDAV doesn't work.<br>
+	Unfortunately, even though Meqaris tries to keep all <code>EXDATE</code>
+	values in one line, at least Cyrus IMAP translates them into
+	multiple, separate entries.<br>
+	Unfortunately, despite the RFC saying that multiple <code>EXDATE</code>
+	entries are allowed, not all clients support this.<br>
+	</li>
 </ul>
 
 </body></html>

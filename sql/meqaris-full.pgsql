@@ -115,6 +115,47 @@ comment on index meq_resource_reservations_resource_fk is 'The index for the res
 create index meq_resource_reservations_events_fk on meq_resource_reservations (rr_e_id);
 comment on index meq_resource_reservations_events_fk is 'The index for the reservation''s event foreign key';
 
+------------------ CALDAV SERVERS ------------------
+
+create table meqaris.meq_caldav_servers
+(
+	cals_id serial constraint cals_pk primary key,
+	cals_name varchar(1000) not null,
+	cals_url varchar(1000) not null constraint cals_url_unique unique,
+	cals_username varchar(1000),
+	cals_password varchar(1000),
+	cals_realm varchar(1000)
+);
+
+comment on table meqaris.meq_caldav_servers is 'The table for CalDAV servers';
+comment on column meqaris.meq_caldav_servers.cals_id is 'CalDAV server ID (assigned automatically)';
+comment on column meqaris.meq_caldav_servers.cals_name is 'CalDAV server name';
+comment on column meqaris.meq_caldav_servers.cals_url is 'CalDAV server URL';
+comment on column meqaris.meq_caldav_servers.cals_username is 'CalDAV server username (if needed)';
+comment on column meqaris.meq_caldav_servers.cals_password is 'CalDAV server password (if needed)';
+comment on column meqaris.meq_caldav_servers.cals_realm is 'CalDAV server access realm (if needed)';
+
+------------------ CALDAV SERVER-TO-RESOURCE MAPPING ------------------
+
+create table meqaris.meq_caldav_servers_resources
+(
+	calres_cals_id int constraint calres_cals_fk not null
+		references meqaris.meq_caldav_servers (cals_id) on delete cascade,
+	calres_r_id int constraint calres_r_fk not null
+		references meqaris.meq_resources (r_id) on delete cascade,
+	constraint calres_unique unique (calres_cals_id, calres_r_id)
+);
+
+comment on table meqaris.meq_caldav_servers_resources is 'The table for CalDAV server-to-resource mapping';
+comment on column meqaris.meq_caldav_servers_resources.calres_cals_id is 'CalDAV server ID';
+comment on column meqaris.meq_caldav_servers_resources.calres_r_id is 'Resource ID';
+
+create index meq_caldav_servers_resources_cal_fk on meq_caldav_servers_resources (calres_cals_id);
+comment on index meq_caldav_servers_resources_cal_fk is 'The index for the calendar server foreign key in CalDAV server-to-resource mapping';
+
+create index meq_caldav_servers_resources_resource_fk on meq_caldav_servers_resources (calres_r_id);
+comment on index meq_caldav_servers_resources_resource_fk is 'The index for the resource foreign key in CalDAV server-to-resource mapping';
+
 ------------------ CONFIGURATION ------------------
 
 create table meqaris.meq_config

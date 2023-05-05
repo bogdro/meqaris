@@ -24,6 +24,7 @@ Requirements:
   * DBI,
   * Fcntl,
   * Getopt::Long,
+  * HTTP::DAV,
   * Log::Log4perl,
   * MIME::Base64,
   * MIME::Parser,
