@@ -572,6 +572,37 @@ if ( $enable ) {
 	exit 0;
 }
 
+if ( $set ) {
+
+	log_info "Command line: --set: name='$set'";
+	if ( $set eq 'db_version' ) {
+
+		log_debug 'Attempting to modify a forbidden parameter';
+		exit 1;
+	}
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
+	my $rowcount = $stmth->execute ($set, $value);
+	if ( $dbh->errstr ) {
+		my $msg = 'Database: cannot modify setting: ' . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = 'Database: cannot modify setting - not found.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	$dbh->disconnect;
+	my $msg = "Setting '$set' modified successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
 if ( $update ) {
 
 	log_info "Command line: --update: name='$name' email='$email' desc='$description'";
@@ -732,37 +763,6 @@ if ( $update_caldav_server ) {
 	}
 	$dbh->disconnect;
 	my $msg = "CalDAV server '$update_caldav_server' updated successfully.";
-	log_info $msg;
-	print $msg . "\n";
-	exit 0;
-}
-
-if ( $set ) {
-
-	log_info "Command line: --set: name='$set'";
-	if ( $set eq 'db_version' ) {
-
-		log_debug 'Attempting to modify a forbidden parameter';
-		exit 1;
-	}
-	my $dbh = db_connect_print();
-	db_upgrade_print ($dbh);
-	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
-	my $rowcount = $stmth->execute ($set, $value);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot modify setting: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot modify setting - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	$dbh->disconnect;
-	my $msg = "Setting '$set' modified successfully.";
 	log_info $msg;
 	print $msg . "\n";
 	exit 0;
