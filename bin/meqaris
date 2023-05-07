@@ -320,7 +320,17 @@ if ( $status ) {
 
 if ( $add_caldav_resource ) {
 
-	log_info "Command line: --add-caldav-resource: res_name='$name', server_name='$add_caldav_resource'";
+	log_info "Command line: --add-caldav-resource: server_name='"
+		. ((defined $add_caldav_resource)? $add_caldav_resource : 'undef') . "', res_name='"
+		. ((defined $name)? $name : 'undef') . "'";
+	if ( is_empty($name) and is_empty($add_caldav_resource) ) {
+
+		my $msg = 'Name of the server and resource are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
 	my $dbh = db_connect_print();
 	db_upgrade_print ($dbh);
 	my $stmth = db_stmt_print ($dbh,
@@ -349,7 +359,11 @@ if ( $add_caldav_resource ) {
 
 if ( $add_caldav_server ) {
 
-	log_info "Command line: --add-caldav-server: name='$name', url='$add_caldav_server', user='$user', realm='$realm'";
+	log_info "Command line: --add-caldav-server: url='"
+		. ((defined $add_caldav_server)? $add_caldav_server : 'undef') . "', name='"
+		. ((defined $name)? $name : 'undef') . "', user='"
+		. ((defined $user)? $user : 'undef') . "', realm='"
+		. ((defined $realm)? $realm : 'undef') . "'";
 	if ( is_empty($name) or is_empty($add_caldav_server) ) {
 
 		my $msg = 'Name and URL are required.';
@@ -385,7 +399,18 @@ if ( $add_caldav_server ) {
 
 if ( $create ) {
 
-	log_info "Command line: --create: name='$create' email='$email' desc='$description'";
+	log_info "Command line: --create: name='"
+		. ((defined $create)? $create : 'undef') . "', email='"
+		. ((defined $email)? $email : 'undef') . "', description='"
+		. ((defined $description)? $description : 'undef') . "'";
+	if ( is_empty($create) and is_empty($email) ) {
+
+		my $msg = 'Name and e-mail are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
 
 	my $dbh = db_connect_print();
 	db_upgrade_print ($dbh);
@@ -442,7 +467,17 @@ if ( $delete ) {
 
 if ( $delete_caldav_resource ) {
 
-	log_info "Command line: --delete-caldav-resource: res_name='$name', server_name='$delete_caldav_resource'";
+	log_info "Command line: --delete-caldav-resource: server_name='"
+		. ((defined $delete_caldav_resource)? $delete_caldav_resource : 'undef') . "', res_name='"
+		. ((defined $name)? $name : 'undef') . "'";
+	if ( is_empty($name) or is_empty($delete_caldav_resource) ) {
+
+		my $msg = 'Name of the server and resource are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
 	my $dbh = db_connect_print();
 	db_upgrade_print ($dbh);
 	my $stmth = db_stmt_print ($dbh,
@@ -471,7 +506,15 @@ if ( $delete_caldav_resource ) {
 
 if ( $delete_caldav_server ) {
 
-	log_info "Command line: --delete-caldav-server: name='$delete_caldav_server'";
+	log_info "Command line: --delete-caldav-server: server_name='"
+		. ((defined $delete_caldav_server)? $delete_caldav_server : 'undef') . "'";
+	if ( is_empty($delete_caldav_server) ) {
+
+		my $msg = 'Name is required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
 	my $dbh = db_connect_print();
 	db_upgrade_print ($dbh);
 	my $stmth = db_stmt_print ($dbh,
@@ -574,7 +617,8 @@ if ( $enable ) {
 
 if ( $set ) {
 
-	log_info "Command line: --set: name='$set'";
+	log_info "Command line: --set: name='$set', value='"
+		. ((defined $value)? $value : 'undef') . "'";
 	if ( $set eq 'db_version' ) {
 
 		log_debug 'Attempting to modify a forbidden parameter';
@@ -605,8 +649,11 @@ if ( $set ) {
 
 if ( $update ) {
 
-	log_info "Command line: --update: name='$name' email='$email' desc='$description'";
-	if ( $name eq '' and $email eq '' and $description eq '' ) {
+	log_info "Command line: --update: name='"
+		. ((defined $name)? $name : 'undef') . "', email='"
+		. ((defined $email)? $email : 'undef') . "', description='"
+		. ((defined $description)? $description : 'undef') . "'";
+	if ( is_empty($name) and is_empty($email) and is_empty($description) ) {
 
 		my $msg = 'Neither a new name, a new e-mail address or a new description have been provided.';
 		log_error $msg;
@@ -702,7 +749,7 @@ if ( $update_caldav_server ) {
 		$first = 0;
 		$par_cnt++;
 	}
-	if ( defined ($url) ) {
+	if ( !is_empty ($url) ) {
 
 		if ( ! $first ) {
 			$sql .= ', ';
@@ -712,7 +759,7 @@ if ( $update_caldav_server ) {
 		$first = 0;
 		$par_cnt++;
 	}
-	if ( defined ($user) ) {
+	if ( !is_empty ($user) ) {
 
 		if ( ! $first ) {
 			$sql .= ', ';
@@ -723,7 +770,7 @@ if ( $update_caldav_server ) {
 		$par_cnt++;
 	}
 
-	if ( defined ($password) ) {
+	if ( !is_empty ($password) ) {
 
 		if ( ! $first ) {
 			$sql .= ', ';
@@ -734,7 +781,7 @@ if ( $update_caldav_server ) {
 		$par_cnt++;
 	}
 
-	if ( defined ($realm) ) {
+	if ( !is_empty ($realm) ) {
 
 		if ( ! $first ) {
 			$sql .= ', ';
