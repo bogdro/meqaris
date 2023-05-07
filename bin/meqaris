@@ -40,6 +40,27 @@ use Term::ANSIColor qw(:constants);	# core (5.6.0)
 my $meqaris_version = '1.4';
 my $meqaris_dbversion = 7;
 
+sub send_mail ($$$$@);
+sub send_accept ($$$$$$$);
+sub send_decline ($$$$$$);
+sub process_insert_error ($$$$$);
+sub insert_event (\%);
+sub notify_caldav ($$$$$);
+sub val ($);
+sub val_limit ($);
+sub clean_name ($);
+sub prop_array ($$);
+sub is_empty ($);
+sub get_sender_mail;
+sub db_stmt ($$);
+sub db_stmt_print ($$);
+sub db_version ($);
+sub db_run_file ($$);
+sub db_upgrade ($);
+sub db_upgrade_print ($);
+sub dbunlock();
+sub dblock();
+
 # ============================ Loggers: ===================================
 
 my $logger = undef;
@@ -68,26 +89,7 @@ eval {
 
 # ============================ Command line processing =======================
 
-sub send_mail ($$$$@);
-sub send_accept ($$$$$$$);
-sub send_decline ($$$$$$);
-sub process_insert_error ($$$$$);
-sub insert_event (\%);
-sub notify_caldav ($$$$$);
-sub val ($);
-sub val_limit ($);
-sub clean_name ($);
-sub prop_array ($$);
-sub is_empty ($);
-sub get_sender_mail;
-sub db_stmt ($$);
-sub db_stmt_print ($$);
-sub db_version ($);
-sub db_run_file ($$);
-sub db_upgrade ($);
-sub db_upgrade_print ($);
-sub dbunlock();
-sub dblock();
+sub check_cmd_error($$$$);
 
 log_trace 'Reading the command line.';
 
@@ -338,18 +340,7 @@ if ( $add_caldav_resource ) {
 		. 'select (select cals_id from meqaris.meq_caldav_servers where cals_name = $1), '
 		. '(select r_id from meqaris.meq_resources where r_name = $2)');
 	my $rowcount = $stmth->execute ($add_caldav_resource, $name);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot add CalDAV resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot add CalDAV resource (unknown error).';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'add CalDAV resource', 'not found');
 	$dbh->disconnect;
 	my $msg = "Resource '$name' successfully added to CalDAV server '$add_caldav_resource'.";
 	log_info $msg;
@@ -378,18 +369,7 @@ if ( $add_caldav_server ) {
 		'insert into meqaris.meq_caldav_servers (cals_name, cals_url, cals_username, cals_password, cals_realm) '
 		. 'values ($1, $2, $3, $4, $5)');
 	my $rowcount = $stmth->execute ($name, $add_caldav_server, $user, $password, $realm);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot add CalDAV server: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot add CalDAV server (unknown error).';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'add CalDAV server', 'unknown error');
 	$dbh->disconnect;
 	my $msg = "CalDAV server '$name' added successfully.";
 	log_info $msg;
@@ -418,18 +398,7 @@ if ( $create ) {
 	$create = clean_name ($create);
 	my $rowcount = $stmth->execute (val_limit ($create),
 		val_limit ($email), val_limit ($description));
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot create resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot create resource (unknown error).';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'create resource', 'unknown error');
 	$dbh->disconnect;
 	my $msg = "Resource '$create' added successfully.";
 	log_info $msg;
@@ -446,18 +415,7 @@ if ( $delete ) {
 	my $stmth = db_stmt_print ($dbh, 'delete from meqaris.meq_resources where r_name = $1');
 	$delete = clean_name ($delete);
 	my $rowcount = $stmth->execute ($delete);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot delete resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot delete resource - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'delete resource', 'not found');
 	$dbh->disconnect;
 	my $msg = "Resource '$delete' deleted successfully.";
 	log_info $msg;
@@ -485,18 +443,7 @@ if ( $delete_caldav_resource ) {
 		. 'calres_cals_id = (select cals_id from meqaris.meq_caldav_servers where cals_name = $1) '
 		. 'and calres_r_id = (select r_id from meqaris.meq_resources where r_name = $2)');
 	my $rowcount = $stmth->execute ($delete_caldav_resource, $name);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot unassign CalDAV resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot unassign CalDAV resource - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'unassign CalDAV resource', 'not found');
 	$dbh->disconnect;
 	my $msg = "Resource '$name' successfully unassigned from CalDAV server '$delete_caldav_resource'.";
 	log_info $msg;
@@ -520,18 +467,7 @@ if ( $delete_caldav_server ) {
 	my $stmth = db_stmt_print ($dbh,
 		'delete from meqaris.meq_caldav_servers where cals_name = $1');
 	my $rowcount = $stmth->execute ($delete_caldav_server);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot delete CalDAV server: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot delete CalDAV server - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'delete CalDAV server', 'not found');
 	$dbh->disconnect;
 	my $msg = "CalDAV server '$delete_caldav_server' deleted successfully.";
 	log_info $msg;
@@ -546,12 +482,7 @@ if ( $destroy_db ) {
 	my $dbh = db_connect_print();
 	my $stmth = db_stmt_print ($dbh, 'drop schema meqaris cascade');
 	$stmth->execute();
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot destroy the database schema: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, 1, 'destroy the database schema', 'unknown error');
 	$dbh->disconnect;
 	my $msg = 'Database schema deleted.';
 	log_info $msg;
@@ -568,18 +499,7 @@ if ( $disable ) {
 	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_resources set r_enabled = false where r_name = $1');
 	$disable = clean_name ($disable);
 	my $rowcount = $stmth->execute ($disable);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot disable resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot disable resource - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'disable resource', 'not found');
 	$dbh->disconnect;
 	my $msg = "Resource '$disable' disabled successfully.";
 	log_info $msg;
@@ -596,18 +516,7 @@ if ( $enable ) {
 	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_resources set r_enabled = true where r_name = $1');
 	$enable = clean_name ($enable);
 	my $rowcount = $stmth->execute ($enable);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot enable resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot enable resource - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'enable resource', 'not found');
 	$dbh->disconnect;
 	my $msg = "Resource '$enable' enabled successfully.";
 	log_info $msg;
@@ -628,18 +537,7 @@ if ( $set ) {
 	db_upgrade_print ($dbh);
 	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
 	my $rowcount = $stmth->execute ($set, $value);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot modify setting: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot modify setting - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'modify setting', 'not found');
 	$dbh->disconnect;
 	my $msg = "Setting '$set' modified successfully.";
 	log_info $msg;
@@ -700,18 +598,7 @@ if ( $update ) {
 
 	my $stmth = db_stmt_print ($dbh, $sql);
 	my $rowcount = $stmth->execute (@values);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot update resource: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot update resource - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'update resource', 'not found');
 	$dbh->disconnect;
 	my $msg = "Resource '$update' updated successfully.";
 	log_info $msg;
@@ -796,18 +683,7 @@ if ( $update_caldav_server ) {
 
 	my $stmth = db_stmt_print ($dbh, $sql);
 	my $rowcount = $stmth->execute (@values);
-	if ( $dbh->errstr ) {
-		my $msg = 'Database: cannot update CalDAV server: ' . $dbh->errstr;
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		my $msg = 'Database: cannot update CalDAV server - not found.';
-		log_error $msg;
-		print $msg . "\n";
-		exit 2;
-	}
+	check_cmd_error ($dbh, $rowcount, 'update CalDAV server', 'not found');
 	$dbh->disconnect;
 	my $msg = "CalDAV server '$update_caldav_server' updated successfully.";
 	log_info $msg;
@@ -826,6 +702,27 @@ if ( $upgrade_db ) {
 	log_info $msg;
 	print $msg . "\n";
 	exit 0;
+}
+
+sub check_cmd_error($$$$) {
+
+	my $dbh = shift;
+	my $rowcount = shift;
+	my $action = shift;
+	my $reason = shift;
+
+	if ( $dbh->errstr ) {
+		my $msg = "Database: cannot $action: " . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = "Database: cannot $action ($reason).";
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
 }
 
 # ============================ Input processing ===================================
