@@ -57,10 +57,12 @@ Various versions of Meqaris have been successfully used with the following
 	- 13.x (checked: 13.9)
 	- 14.x (checked: 14.1)
 	- 15.x (checked: 15.1)
-2. Perl:
+2. Perl (https://www.perl.org/):
 	- v5.20.3
 	- v5.34.0
-3. Postfix:
+3. Postfix (https://www.postfix.org/):
 	- 3.6.5
+4. Cyrus IMAP (https://www.cyrusimap.org/) (CalDAV module):
+	- 3.6.0
 
 Other versions may also work.
