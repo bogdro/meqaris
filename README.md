@@ -18,7 +18,7 @@ Features:
   - supports creation, updates and cancellation of single events,
   - supports creation, updates and cancellation of recurring events,
   - supports both interval-defined and duration-defined events,
-  - supports CalDAV,
+  - supports CalDAV (RFC 4791),
   - supports booking multiple resources in a single invitation,
   - automatically updates its own database structures to the required version when needed,
   - supports time zones,
