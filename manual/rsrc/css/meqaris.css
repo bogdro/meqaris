@@ -27,14 +27,14 @@
 /* CSS 1 (most) */
 
 body		{
-			/*font-family: sans-serif, serif, arial;*/
-			background-color: #87CEEB;
+			/* font-family: sans-serif, serif, arial; */
+			background-color: #87ceeb;
 			color: black;
 			text-align: justify;
 		}
 
 a:link		{
-			background-color: #87CEEB;
+			background-color: #87ceeb;
 			color: blue;
 			text-transform: none;
 			text-decoration: underline;
@@ -42,14 +42,14 @@ a:link		{
 		}
 
 a:visited	{
-			background-color: #87CEEB;
+			background-color: #87ceeb;
 			color: #006000;
 			text-transform: none;
 			text-decoration: underline;
 			font-weight: bold;
 		}
 
-A:active	{
+a:active	{
 			background-color: inherit;
 			color: yellow;
 		}
@@ -61,17 +61,16 @@ a:focus		{
 
 pre		{
 /* 			font-family: monospace, "courier new", courier; */
-			background-color: #D0FFFF;
+			background-color: #d0ffff;
 			color: black;
 		}
 
 code, kbd, samp, var
 		{
 /* 			font-family: monospace, "courier new", courier; */
-			background-color: #A0EEEE;
+			background-color: #a0eeee;
 			color: black;
 		}
-
 
 img		{
 			border-style: none;
@@ -93,12 +92,12 @@ img.frame	{
 /* Graphical signification of acronyms and abbreviations */
 acronym, abbr	{
 			border-bottom: 1px dotted black;
-			cursor:	help; 		/* CSS 2 */
+			cursor: help; 		/* CSS 2 */
 		}
 
 /* Important information */
 .important	{
-			/*text-transform: uppercase;*/
+			/* text-transform: uppercase; */
 			text-decoration: underline;
 			font-weight: bold;
 			font-style: normal;
