@@ -23,5 +23,5 @@
 
 [[ -z "$1" ]] && echo "Usage: $0 <dump file>" && exit 1
 
-pg_restore -U meqaris -d meqaris $1
+pg_restore -U meqaris -d meqaris "$1"
 
