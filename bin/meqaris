@@ -1902,20 +1902,24 @@ sub notify_caldav ($$$$$) {
 	if ( defined ($caldav_servers) ) {
 
 		log_trace 'CalDAV: got list of servers. Length: ' . (scalar @{$caldav_servers});
-		my $caldav_entry = Data::ICal->new (rfc_strict => 1);
-		$caldav_entry->add_property('METHOD', 'REQUEST'); # even for deleting single occurrences
-		$caldav_entry->add_entry ($event);
-		my $caldav_string = $caldav_entry->as_string;
-		# Need to have just one EXDATE (for compatibility), but
-		# Data::ICal::Property->value() accepts only 1 value and
-		# escapes any commas inside, so remove escape backslashes
-		# from EXDATE - works only this way. Some CalDAV servers
-		# turn it into separate entries anyway, which defeats the
-		# purpose (we can do this ourselves), but at least we do what we can:
-		while ($caldav_string =~ /(EXDATE.*)\\,(.*[\r\n]+)/o) {
-			$caldav_string =~ s/(EXDATE.*)\\,(.*[\r\n]+)/$1,$2/;
+		my $caldav_string = '';
+		if ( $type eq 'PUT' ) {
+
+			my $caldav_entry = Data::ICal->new (rfc_strict => 1);
+			$caldav_entry->add_property('METHOD', 'REQUEST'); # even for deleting single occurrences
+			$caldav_entry->add_entry ($event);
+			$caldav_string = $caldav_entry->as_string;
+			# Need to have just one EXDATE (for compatibility), but
+			# Data::ICal::Property->value() accepts only 1 value and
+			# escapes any commas inside, so remove escape backslashes
+			# from EXDATE - works only this way. Some CalDAV servers
+			# turn it into separate entries anyway, which defeats the
+			# purpose (we can do this ourselves), but at least we do what we can:
+			while ($caldav_string =~ /(EXDATE.*)\\,(.*[\r\n]+)/o) {
+				$caldav_string =~ s/(EXDATE.*)\\,(.*[\r\n]+)/$1,$2/;
+			}
+			log_debug "CalDAV: will send this iCalendar:\n" . $caldav_string unless (scalar @{$caldav_servers}) == 0;
 		}
-		log_debug "CalDAV: will send this iCalendar:\n" . $caldav_string;
 		for my $server (@{$caldav_servers}) {
 
 			my $conn = HTTP::DAV->new();
