@@ -314,7 +314,6 @@ if ( $status ) {
 					"You may need to run 'meqaris --upgrade-db'.\n";
 				$error = 2;
 			}
-			$dbh->disconnect;
 		}
 	}
 	exit $error;
@@ -341,7 +340,6 @@ if ( $add_caldav_resource ) {
 		. '(select r_id from meqaris.meq_resources where r_name = $2)');
 	my $rowcount = $stmth->execute ($add_caldav_resource, $name);
 	check_cmd_error ($dbh, $rowcount, 'add CalDAV resource', 'not found');
-	$dbh->disconnect;
 	my $msg = "Resource '$name' successfully added to CalDAV server '$add_caldav_resource'.";
 	log_info $msg;
 	print $msg . "\n";
@@ -370,7 +368,6 @@ if ( $add_caldav_server ) {
 		. 'values ($1, $2, $3, $4, $5)');
 	my $rowcount = $stmth->execute ($name, $add_caldav_server, $user, $password, $realm);
 	check_cmd_error ($dbh, $rowcount, 'add CalDAV server', 'unknown error');
-	$dbh->disconnect;
 	my $msg = "CalDAV server '$name' added successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -399,7 +396,6 @@ if ( $create ) {
 	my $rowcount = $stmth->execute (val_limit ($create),
 		val_limit ($email), val_limit ($description));
 	check_cmd_error ($dbh, $rowcount, 'create resource', 'unknown error');
-	$dbh->disconnect;
 	my $msg = "Resource '$create' added successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -416,7 +412,6 @@ if ( $delete ) {
 	$delete = clean_name ($delete);
 	my $rowcount = $stmth->execute ($delete);
 	check_cmd_error ($dbh, $rowcount, 'delete resource', 'not found');
-	$dbh->disconnect;
 	my $msg = "Resource '$delete' deleted successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -444,7 +439,6 @@ if ( $delete_caldav_resource ) {
 		. 'and calres_r_id = (select r_id from meqaris.meq_resources where r_name = $2)');
 	my $rowcount = $stmth->execute ($delete_caldav_resource, $name);
 	check_cmd_error ($dbh, $rowcount, 'unassign CalDAV resource', 'not found');
-	$dbh->disconnect;
 	my $msg = "Resource '$name' successfully unassigned from CalDAV server '$delete_caldav_resource'.";
 	log_info $msg;
 	print $msg . "\n";
@@ -468,7 +462,6 @@ if ( $delete_caldav_server ) {
 		'delete from meqaris.meq_caldav_servers where cals_name = $1');
 	my $rowcount = $stmth->execute ($delete_caldav_server);
 	check_cmd_error ($dbh, $rowcount, 'delete CalDAV server', 'not found');
-	$dbh->disconnect;
 	my $msg = "CalDAV server '$delete_caldav_server' deleted successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -483,7 +476,6 @@ if ( $destroy_db ) {
 	my $stmth = db_stmt_print ($dbh, 'drop schema meqaris cascade');
 	$stmth->execute();
 	check_cmd_error ($dbh, 1, 'destroy the database schema', 'unknown error');
-	$dbh->disconnect;
 	my $msg = 'Database schema deleted.';
 	log_info $msg;
 	print $msg . "\n";
@@ -500,7 +492,6 @@ if ( $disable ) {
 	$disable = clean_name ($disable);
 	my $rowcount = $stmth->execute ($disable);
 	check_cmd_error ($dbh, $rowcount, 'disable resource', 'not found');
-	$dbh->disconnect;
 	my $msg = "Resource '$disable' disabled successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -517,7 +508,6 @@ if ( $enable ) {
 	$enable = clean_name ($enable);
 	my $rowcount = $stmth->execute ($enable);
 	check_cmd_error ($dbh, $rowcount, 'enable resource', 'not found');
-	$dbh->disconnect;
 	my $msg = "Resource '$enable' enabled successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -538,7 +528,6 @@ if ( $set ) {
 	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
 	my $rowcount = $stmth->execute ($set, $value);
 	check_cmd_error ($dbh, $rowcount, 'modify setting', 'not found');
-	$dbh->disconnect;
 	my $msg = "Setting '$set' modified successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -599,7 +588,6 @@ if ( $update ) {
 	my $stmth = db_stmt_print ($dbh, $sql);
 	my $rowcount = $stmth->execute (@values);
 	check_cmd_error ($dbh, $rowcount, 'update resource', 'not found');
-	$dbh->disconnect;
 	my $msg = "Resource '$update' updated successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -684,7 +672,6 @@ if ( $update_caldav_server ) {
 	my $stmth = db_stmt_print ($dbh, $sql);
 	my $rowcount = $stmth->execute (@values);
 	check_cmd_error ($dbh, $rowcount, 'update CalDAV server', 'not found');
-	$dbh->disconnect;
 	my $msg = "CalDAV server '$update_caldav_server' updated successfully.";
 	log_info $msg;
 	print $msg . "\n";
@@ -697,7 +684,6 @@ if ( $upgrade_db ) {
 
 	my $dbh = db_connect_print();
 	db_upgrade_print ($dbh);
-	$dbh->disconnect;
 	my $msg = 'Database upgraded successfully.';
 	log_info $msg;
 	print $msg . "\n";
