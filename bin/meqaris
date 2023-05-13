@@ -714,20 +714,11 @@ sub check_cmd_error($$$$) {
 # ============================ Input processing ===================================
 
 log_trace 'Connecting to the database.';
-
 my $dbh = db_connect();
-if ( ! $dbh ) {
+exit 2 if ! $dbh;
 
-	dbunlock();
-	exit 2;
-}
 log_trace 'Checking if database upgrade needed.';
-
-if ( ! db_upgrade ($dbh) ) {
-
-	dbunlock();
-	exit 3;
-}
+exit 3 if ! db_upgrade ($dbh);
 
 log_trace 'Reading configuration from the database.';
 
@@ -760,7 +751,6 @@ my $entity = $parser->parse(\*STDIN);
 if ( ! $entity ) {
 
 	log_fatal 'Standard input parsing failed: ' . $parser->last_error;
-	dbunlock();
 	exit 4;
 }
 
