@@ -769,9 +769,15 @@ log_trace 'Standard input processed';
 my @parts = $entity->parts;
 
 my $sender = $entity->head->get('From', 0);
-chomp $sender;
 my $subject = $entity->head->get('Subject', 0);
+if ( is_empty($sender) or is_empty($subject) ) {
+
+	log_fatal 'Malformed input - the crucial "From" or "Subject" header is missing or is empty.';
+	exit 4;
+}
+chomp $sender;
 chomp $subject;
+
 my $reply_sender = '';
 my $response_type = '';
 
