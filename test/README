@@ -1,0 +1,18 @@
+To run the tests:
+
+1) create a test PostgreSQL database (default: meqaris-test running locally),
+
+2) set a password if required (default: meqaris01),
+
+3) allow some user to connect to the database (default: meqaris),
+
+4) run
+	./test-suite.sh
+
+  or
+
+	make check
+
+  (from the top directory).
+
+Consult the code in 'test-func.bash' to change the defaults if needed.

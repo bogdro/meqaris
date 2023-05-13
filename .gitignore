@@ -1,2 +1,4 @@
 TODO*
 *.log
+test/meqaris-log4perl-test.cfg
+test/meqaris-test.ini

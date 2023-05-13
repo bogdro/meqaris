@@ -1,0 +1,280 @@
+#!/usr/bin/perl
+#
+# Copyright (C) 2022-2023 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
+#
+# This file is part of Meqaris (Meeting Equipment and Room Invitation System),
+#  software that allows booking meeting rooms and other resources using
+#  e-mail invitations.
+# Meqaris homepage: https://meqaris.sourceforge.io/
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU Affero General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU Affero General Public License for more details.
+#
+#  You should have received a copy of the GNU Affero General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+
+sub is_empty ($);
+
+# ============================ Command line processing =======================
+
+Getopt::Long::Configure('ignore_case', 'ignore_case_always');
+
+my $attendee = '';
+my $dtstamp = '';
+my $dtstart = '';
+my $dtend = '';
+my $duration = '';
+my $exdate = '';
+my $exrule = '';
+my $from = '';
+my $help = '';
+my $lic = '';
+my $method = 'REQUEST';
+my $organizer = '';
+my $rdate = '';
+my $recur_id = '';
+my $role = 'REQ-PARTICIPANT';
+my $rrule = '';
+my $seq = '0';
+my $status = 'CONFIRMED';
+my $subject = '';
+my $to = '';
+my $uid = '';
+
+if ( !GetOptions (
+	'attendee=s'		=> \$attendee,
+	'dtstamp=s'		=> \$dtstamp,
+	'dtstart=s'		=> \$dtstart,
+	'dtend=s'		=> \$dtend,
+	'duration=s'		=> \$duration,
+	'exdate=s'		=> \$exdate,
+	'exrule=s'		=> \$exrule,
+	'from=s'		=> \$from,
+	'h|help|?'		=> \$help,
+	'license|licence'	=> \$lic,
+	'method=s'		=> \$method,
+	'organizer=s'		=> \$organizer,
+	'rdate=s'		=> \$rdate,
+	'recur-id=s'		=> \$recur_id,
+	'role=s'		=> \$role,
+	'rrule=s'		=> \$rrule,
+	'seq=s'			=> \$seq,
+	'status=s'		=> \$status,
+	'subject=s'		=> \$subject,
+	'to=s'			=> \$to,
+	'uid=s'			=> \$uid,
+	)
+   ) {
+	print_help();
+	exit 1;
+}
+
+if ( $lic ) {
+	print
+		"Meqaris (Meeting Equipment and Room Invitation System)\n" .
+		" - test generator. See https://meqaris.sourceforge.io/\n" .
+		"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
+		"  This program is free software: you can redistribute it and/or modify\n" .
+		"  it under the terms of the GNU Affero General Public License as published by\n" .
+		"  the Free Software Foundation, either version 3 of the License, or\n" .
+		"  (at your option) any later version.\n\n" .
+		"  This program is distributed in the hope that it will be useful,\n" .
+		"  but WITHOUT ANY WARRANTY; without even the implied warranty of\n" .
+		"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n" .
+		"  GNU Affero General Public License for more details.\n\n" .
+		"  You should have received a copy of the GNU Affero General Public License\n" .
+		"  along with this program.  If not, see <http://www.gnu.org/licenses/>.\n"
+		;
+	exit 0;
+}
+
+if ( $help ) {
+	print_help();
+	exit 0;
+}
+
+if ( is_empty($dtstart)
+	or is_empty($from) or is_empty($organizer) or is_empty($subject)
+	or is_empty($to) or is_empty($uid) ) {
+
+	print "Missing parameter.\n";
+	print_help();
+	exit 1;
+}
+
+my @mon_abbr = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+my @wday_abbr = qw(Sun Mon Tue Wed Thu Fri Sat);
+my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = gmtime;
+$year += 1900;
+$mon += 1;
+
+if ( is_empty($dtstamp) ) {
+
+	$dtstamp = sprintf ("%04d%02d%02dT%02d%02d%02dZ",
+		$year, $mon, $mday, $hour, $min, $sec);
+}
+
+my $mail_date = sprintf ("%s, %02d %s %04d %02d:%02d:%02d +0000",
+	$wday_abbr[$wday], $mday, $mon_abbr[$mon],
+		$year, $hour, $min, $sec);
+
+my $to_part = join ';', (split /,/o, $to);
+print
+"From: $from
+To: $to
+Subject: $subject
+Date: $mail_date
+Message-ID: <$uid\@localhost>
+Accept-Language: en-US
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary=\"BOUND_0_$uid\"
+MIME-Version: 1.0
+
+--BOUND_0_$uid
+Content-Type: text/plain; charset=\"iso-8859-1\"
+Content-Transfer-Encoding: quoted-printable
+
+
+$subject
+
+
+--BOUND_0_$uid
+Content-Type: text/html; charset=\"iso-8859-1\"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D\"Content-Type\" content=3D\"text/html; charset=3Diso-8859-=
+1\">
+</head>
+<body lang=3D\"EN-US\">
+$subject
+</body>
+</html>
+
+--BOUND_0_$uid
+Content-Type: text/calendar; charset=\"utf-8\"; method=$method
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+METHOD:$method
+PRODID:Meqaris test generator 1.0
+VERSION:2.0
+BEGIN:VEVENT
+ORGANIZER:$organizer
+";
+if ( !is_empty ($attendee) ) {
+
+	for my $att (split /,/o, $attendee) {
+		print
+"ATTENDEE;ROLE=$role;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;
+ CN=$att\n";
+	}
+}
+print 
+"DESCRIPTION;LANGUAGE=en-US:$subject
+UID:$uid
+SUMMARY;LANGUAGE=en-US:$subject
+DTSTART:$dtstart
+";
+if ( !is_empty ($duration) ) {
+
+	print "DURATION:$duration\n";
+}
+elsif ( !is_empty ($dtend) ) {
+	print "DTEND:$dtend\n";
+}
+if ( !is_empty ($exdate) ) {
+
+	print "EXDATE:$exdate\n";
+}
+if ( !is_empty ($exrule) ) {
+
+	print "EXRULE:$exrule\n";
+}
+if ( !is_empty ($rdate) ) {
+
+	print "RDATE:$rdate\n";
+}
+if ( !is_empty ($rrule) ) {
+
+	print "RRULE:$rrule\n";
+}
+if ( !is_empty ($recur_id) ) {
+
+	print "RECURRENCE-ID:$recur_id\n";
+}
+print 
+"CLASS:PUBLIC
+PRIORITY:5
+DTSTAMP:$dtstamp
+TRANSP:OPAQUE
+STATUS:$status
+SEQUENCE:$seq
+LOCATION;LANGUAGE=en-US:Internet
+END:VEVENT
+END:VCALENDAR
+
+--BOUND_0_$uid--
+"
+;
+
+exit 0;
+
+# ============================ Subroutines: ===================================
+
+# ============================ print_help ===================================
+
+sub print_help {
+
+	print
+		"Meqaris (Meeting Equipment and Room Invitation System)\n" .
+			" - test generator. See https://meqaris.sourceforge.io/\n" .
+			"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
+			"Syntax: meqaris [options]\n\n" .
+			"Options:\n" .
+			"--attendee <attendee>\tSpecify the iCalendar ATTENDEE field\n" .
+			"--dtstamp <dtstamp>\tSpecify the iCalendar DTSTAMP field\n" .
+			"--dtstart <dtstart>\tSpecify the iCalendar DTSTART field\n" .
+			"--dtend <dtend>\t\tSpecify the iCalendar DTEND field\n" .
+			"--duration <duration>\tSpecify the iCalendar DURATION field\n" .
+			"--exdate <exdate>\tSpecify the iCalendar EXDATE property\n" .
+			"--exrule <exrule>\tSpecify the iCalendar EXRULE property\n" .
+			"--from <from>\t\tSpecify the email's From header\n" .
+			"-h|--help|-?\t\tShows this help message\n" .
+			"--license|licence\tShows the license information\n" .
+			"--method <method>\tSpecify the iCalendar METHOD field\n" .
+			"--organizer <organizer>\tSpecify the iCalendar ORGANIZER field\n" .
+			"--rdate <rdate>\t\tSpecify the iCalendar RDATE property\n" .
+			"--recur-id <id>\t\tSpecify the iCalendar RECURRENCE-ID property\n" .
+			"--role <role>\t\tSpecify the attendee's ROLE property\n" .
+			"--rrule <rrule>\t\tSpecify the iCalendar RRULE property\n" .
+			"--seq <seq>\t\tSpecify the iCalendar SEQUENCE field\n" .
+			"--status <status>\tSpecify the iCalendar STATUS field\n" .
+			"--subject <subject>\tSpecify the email's Subject header\n" .
+			"--to <to>\t\tSpecify the email's To header\n" .
+			"--uid <uid>\t\tSpecify the UID of the iCalendar (and e-mail)\n"
+		;
+}
+
+# ============================ is_empty ===================================
+
+sub is_empty ($) {
+
+	my $v = shift;
+	return ((defined ($v) && $v ne '')? 0 : 1);
+}

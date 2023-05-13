@@ -124,4 +124,7 @@ uninstall:
 	$(RMDIR) $(DATADIR)/$(NAME)
 	$(RMDIR) $(MANDIR)/man1/$(NAME).1*
 
-.PHONY: all dist install uninstall
+check:
+	cd test && ./test-suite.sh
+
+.PHONY: all dist install uninstall check
