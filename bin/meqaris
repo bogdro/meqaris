@@ -2242,16 +2242,14 @@ sub dblock () {
 	$lock_filename = "$lockdir/meqaris.lck";
 	log_trace 'Trying to file-lock.';
 
-	sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT);
-	if ( ! defined ($lock_fd) ) {
+	if ( ! sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT) ) {
 
 		my $start_time = time;
 		log_trace 'Waiting for lock';
 
 		while ( time < $start_time + 30 ) {
 
-			sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT);
-			if ( defined ($lock_fd) ) {
+			if ( sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT) ) {
 
 				close $lock_fd; # the file itself is not needed, as long as it exists
 				last;
@@ -2266,6 +2264,7 @@ sub dblock () {
 			return 0;
 		}
 	}
+	log_trace 'File-lock done.';
 	return 1;
 }
 
