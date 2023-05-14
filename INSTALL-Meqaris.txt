@@ -302,7 +302,8 @@ The address of the user's calendar is
  into http://localhost/dav/calendars/user/room1/Default/.
 
 Unless configured otherwise, the calendar requires authentication - you use
- the username and password passed to the "saslpasswd2" command earlier.
+ the username and password passed to the "saslpasswd2" command earlier,
+ or use some other IMAP user.
 
 After first access to the URL, the calendar should be created.
 
