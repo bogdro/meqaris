@@ -192,7 +192,6 @@ td hr		{	display: none;			}
 			color: black;
 		}
 
-
   acronym, abbr	{	border-bottom: none;		}
 
   .hdr		{	page-break-after: avoid;	}
@@ -242,5 +241,4 @@ td hr		{	display: none;			}
   		}
 
   pre,code,kbd	{	speak-punctuation: code;	}
-
 }
