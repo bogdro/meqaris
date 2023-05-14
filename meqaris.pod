@@ -23,17 +23,33 @@ Meqaris supports the following command-line options:
 
 =over 4
 
+=item B<--add-caldav-resource> I<caldav_server_name> B<--name> I<resource_name>
+
+Assign the CalDAV server with the given name to the meeting resource given in I<--name>.
+
+=item B<--add-caldav-server> I<URL> B<--name> I<caldav_server_name> [B<--user> I<username> B<--password> I<password>] [B<--realm> I<realm_name>]
+
+Add a CalDAV server with the given URL, setting I<--name> and optional I<--user>, I<--password> and I<--realm>.
+
 =item B<--conf> I<file>
 
 Use the given configuration file.
 
-=item B<--create> I<name>
+=item B<--create> I<name> B<--email> I<e-mail_address> [B<--description> I<desc>]
 
 Create a new meeting resource.
 
 =item B<--delete> I<name>
 
-elete a meeting resource with the given name.
+Delete a meeting resource with the given name.
+
+=item B<--delete-caldav-resource> I<caldav_server_name> B<--name> I<resource_name>
+
+Un-assign the CalDAV server with the given name from the resource given in I<--name>.
+
+=item B<--delete-caldav-server> I<caldav_server_name>
+
+Delete the CalDAV server with the given name.
 
 =item B<--description> I<desc>
 
@@ -53,7 +69,7 @@ Specifies an e-mail address for the meeting resource when creating or updating.
 
 =item B<--enable> I<name>
 
-Enables the meeting resource with the given name
+Enables the meeting resource with the given name.
 
 =item B<-h|--help|-?>
 
@@ -63,9 +79,17 @@ Shows the help message.
 
 Shows the license information.
 
-=item B<--name> I<new_name>
+=item B<--name> I<name>
 
-Specifies a new name for the meeting resource when updating.
+Specifies a new name for the meeting resource or CalDAV server.
+
+=item B<--password> I<password>
+
+Specifies a password when creating or updating a CalDAV server.
+
+=item B<--realm> I<realm_name>
+
+Specifies a realm when creating or updating a CalDAV server.
 
 =item B<--set> I<name>
 
@@ -75,18 +99,30 @@ Specifies the name of the configuration setting to modify.
 
 Shows the operability status of Meqaris.
 
-=item B<--update> I<name>
+=item B<--update> I<name> [B<--name> I<new_resource_name>] [B<--email> I<new_e-mail_address>] [B<--description> I<new_description>]
 
 Update a meeting resource with the given name.
+
+=item B<--update-caldav-server> I<caldav_server_name> [B<--url> I<new_URL>] [B<--name> I<new_server_name>] [B<--user> I<new_username> B<--password> I<new_password>] [B<--realm> I<new_realm_name>]
+
+Update a CalDAV server with a new I<--url> / I<--name> / I<--user> / I<--password> / I<--realm>
 
 =item B<--upgrade-db>
 
 Run the necessary Meqaris database structure upgrade scripts.
 
+=item B<--url> I<URL>
+
+Specifies an URL for the CalDAV server when updating.
+
+=item B<--user> I<username>
+
+Specifies a username when creating or updating a CalDAV server.
+
 =item B<--value> I<value>
 
-Specifies the new value of the configuration setting to modify using --set.
-If not provided, the setting is set to NULL.
+Specifies the new value of the configuration setting to modify using I<--set>.
+If not provided, the setting is set to I<NULL>.
 
 =item B<--version>
 
@@ -94,7 +130,7 @@ Display Meqaris version information.
 
 =back
 
-=head1 CONFIG FILE
+=head1 CONFIGURATION FILE
 
 Meqaris uses an INI file to hold the primary configuration. The file's
 default syntax is
@@ -157,10 +193,10 @@ Bogdan Drozdowski, bogdro (at) users . sourceforge . net
 
 =head1 SEE ALSO
 
-Meqaris homepage: https://meqaris.sourceforge.io/
+Meqaris homepage: I<https://meqaris.sourceforge.io/>
 
 Meqaris manual: manual/en/index.html (in the package)
 
-Meqaris wiki: https://sourceforge.net/p/meqaris/wiki/Home/
+Meqaris wiki: I<https://sourceforge.net/p/meqaris/wiki/Home/>
 
 =cut

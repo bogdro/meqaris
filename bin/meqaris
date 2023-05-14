@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
+# Copyright (C) 2022-2023 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
 #
 # This file is part of Meqaris (Meeting Equipment and Room Invitation System),
 #  software that allows booking meeting rooms and other resources using
@@ -32,12 +32,34 @@ use DateTime::TimeZone::ICal;
 use DBI;
 use Fcntl;				# core
 use Getopt::Long;			# core
+use HTTP::DAV;
 use MIME::Base64 qw(encode_base64);	# core
 use MIME::Parser;
 use Term::ANSIColor qw(:constants);	# core (5.6.0)
 
 my $meqaris_version = '1.4';
-my $meqaris_dbversion = 6;
+my $meqaris_dbversion = 7;
+
+sub send_mail ($$$$@);
+sub send_accept ($$$$$$$);
+sub send_decline ($$$$$$);
+sub process_insert_error ($$$$$);
+sub insert_event (\%);
+sub notify_caldav ($$$$$);
+sub val ($);
+sub val_limit ($);
+sub clean_name ($);
+sub prop_array ($$);
+sub is_empty ($);
+sub get_sender_mail;
+sub db_stmt ($$);
+sub db_stmt_print ($$);
+sub db_version ($);
+sub db_run_file ($$);
+sub db_upgrade ($);
+sub db_upgrade_print ($);
+sub dbunlock();
+sub dblock();
 
 # ============================ Loggers: ===================================
 
@@ -67,24 +89,19 @@ eval {
 
 # ============================ Command line processing =======================
 
-sub send_mail ($$$@);
-sub val ($);
-sub prop_array ($$);
-sub is_empty ($);
-sub db_stmt ($$);
-sub db_version ($);
-sub db_run_file ($$);
-sub db_upgrade ($);
-sub dbunlock();
-sub dblock();
+sub check_cmd_error($$$$);
 
 log_trace 'Reading the command line.';
 
 Getopt::Long::Configure('ignore_case', 'ignore_case_always');
 
+my $add_caldav_resource = '';
+my $add_caldav_server = '';
 my $config_file = '/etc/meqaris.ini';
 my $create = '';
 my $delete = '';
+my $delete_caldav_resource = '';
+my $delete_caldav_server = '';
 my $description = '';
 my $destroy_db = '';
 my $disable = '';
@@ -93,31 +110,45 @@ my $enable = '';
 my $help = '';
 my $lic = '';
 my $name = '';
+my $password = '';
+my $realm = '';
 my $set = '';
 my $status = '';
 my $update = '';
+my $update_caldav_server = '';
 my $upgrade_db = '';
+my $user = '';
+my $url = '';
 my $value = undef;
 my $version = '';
 
 if ( !GetOptions (
-	'conf=s'		=> \$config_file,
-	'create=s'		=> \$create,
-	'delete=s'		=> \$delete,
-	'description=s'		=> \$description,
-	'destroy-db'		=> \$destroy_db,
-	'disable=s'		=> \$disable,
-	'email=s'		=> \$email,
-	'enable=s'		=> \$enable,
-	'h|help|?'		=> \$help,
-	'license|licence'	=> \$lic,
-	'name=s'		=> \$name,
-	'set=s'			=> \$set,
-	'status'		=> \$status,
-	'update=s'		=> \$update,
-	'upgrade-db'		=> \$upgrade_db,
-	'value=s'		=> \$value,
-	'version'		=> \$version,
+	'add-caldav-resource=s'		=> \$add_caldav_resource,
+	'add-caldav-server=s'		=> \$add_caldav_server,
+	'conf=s'			=> \$config_file,
+	'create=s'			=> \$create,
+	'delete=s'			=> \$delete,
+	'delete-caldav-resource=s'	=> \$delete_caldav_resource,
+	'delete-caldav-server=s'	=> \$delete_caldav_server,
+	'description=s'			=> \$description,
+	'destroy-db'			=> \$destroy_db,
+	'disable=s'			=> \$disable,
+	'email=s'			=> \$email,
+	'enable=s'			=> \$enable,
+	'h|help|?'			=> \$help,
+	'license|licence'		=> \$lic,
+	'name=s'			=> \$name,
+	'password=s'			=> \$password,
+	'realm=s'			=> \$realm,
+	'set=s'				=> \$set,
+	'status'			=> \$status,
+	'update=s'			=> \$update,
+	'update-caldav-server=s'	=> \$update_caldav_server,
+	'upgrade-db'			=> \$upgrade_db,
+	'url=s'				=> \$url,
+	'user=s'			=> \$user,
+	'value=s'			=> \$value,
+	'version'			=> \$version,
 	)
    ) {
 	print_help();
@@ -259,7 +290,7 @@ if ( $status ) {
 		}
 	}
 	if ( ! $error ) {
-		eval 'use DBD::Pg;'; 
+		eval 'use DBD::Pg;';
 		if ($@) {
 			print 'Database connection: ', BOLD, RED, 'ERROR', RESET, ": Module DBD::Pg not installed\n";
 			$error = 2;
@@ -283,36 +314,91 @@ if ( $status ) {
 					"You may need to run 'meqaris --upgrade-db'.\n";
 				$error = 2;
 			}
-			$dbh->disconnect;
 		}
 	}
 	exit $error;
 }
 
+if ( $add_caldav_resource ) {
+
+	log_info "Command line: --add-caldav-resource: server_name='"
+		. ((defined $add_caldav_resource)? $add_caldav_resource : 'undef') . "', res_name='"
+		. ((defined $name)? $name : 'undef') . "'";
+	if ( is_empty($name) and is_empty($add_caldav_resource) ) {
+
+		my $msg = 'Name of the server and resource are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'insert into meqaris.meq_caldav_servers_resources (calres_cals_id, calres_r_id) '
+		. 'select (select cals_id from meqaris.meq_caldav_servers where cals_name = $1), '
+		. '(select r_id from meqaris.meq_resources where r_name = $2)');
+	my $rowcount = $stmth->execute ($add_caldav_resource, $name);
+	check_cmd_error ($dbh, $rowcount, 'add CalDAV resource', 'not found');
+	my $msg = "Resource '$name' successfully added to CalDAV server '$add_caldav_resource'.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $add_caldav_server ) {
+
+	log_info "Command line: --add-caldav-server: url='"
+		. ((defined $add_caldav_server)? $add_caldav_server : 'undef') . "', name='"
+		. ((defined $name)? $name : 'undef') . "', user='"
+		. ((defined $user)? $user : 'undef') . "', realm='"
+		. ((defined $realm)? $realm : 'undef') . "'";
+	if ( is_empty($name) or is_empty($add_caldav_server) ) {
+
+		my $msg = 'Name and URL are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
+	}
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'insert into meqaris.meq_caldav_servers (cals_name, cals_url, cals_username, cals_password, cals_realm) '
+		. 'values ($1, $2, $3, $4, $5)');
+	my $rowcount = $stmth->execute ($name, $add_caldav_server, $user, $password, $realm);
+	check_cmd_error ($dbh, $rowcount, 'add CalDAV server', 'unknown error');
+	my $msg = "CalDAV server '$name' added successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
 if ( $create ) {
 
-	log_info "Command line: --create: name='$create' email='$email' desc='$description'";
+	log_info "Command line: --create: name='"
+		. ((defined $create)? $create : 'undef') . "', email='"
+		. ((defined $email)? $email : 'undef') . "', description='"
+		. ((defined $description)? $description : 'undef') . "'";
+	if ( is_empty($create) and is_empty($email) ) {
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute(substr ($create, 0, 1000),
-		substr ($email, 0, 1000), substr ($description, 0, 1000));
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot create resource: ' . $dbh->errstr;
-		print 'Database: cannot create resource: ' . $dbh->errstr . "\n";
-		exit 2;
+		my $msg = 'Name and e-mail are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
 	}
-	if ( $rowcount < 1 ) {
-		log_error 'Database: cannot create resource (unknown error).';
-		print "Database: cannot create resource (unknown error).\n";
-		exit 2;
-	}
-	$dbh->disconnect;
-	log_info "Resource '$create' added successfully.";
-	print "Resource '$create' added successfully.\n";
+
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'insert into meqaris.meq_resources(r_name, r_email, r_description) values ($1, $2, $3)');
+	$create = clean_name ($create);
+	my $rowcount = $stmth->execute (val_limit ($create),
+		val_limit ($email), val_limit ($description));
+	check_cmd_error ($dbh, $rowcount, 'create resource', 'unknown error');
+	my $msg = "Resource '$create' added successfully.";
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
@@ -320,25 +406,65 @@ if ( $delete ) {
 
 	log_info "Command line: --delete: name='$delete'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'delete from meqaris.meq_resources where r_name = $1');
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute($delete);
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot delete resource: ' . $dbh->errstr;
-		print 'Database: cannot delete resource: ' . $dbh->errstr . "\n";
-		exit 2;
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'delete from meqaris.meq_resources where r_name = $1');
+	$delete = clean_name ($delete);
+	my $rowcount = $stmth->execute ($delete);
+	check_cmd_error ($dbh, $rowcount, 'delete resource', 'not found');
+	my $msg = "Resource '$delete' deleted successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $delete_caldav_resource ) {
+
+	log_info "Command line: --delete-caldav-resource: server_name='"
+		. ((defined $delete_caldav_resource)? $delete_caldav_resource : 'undef') . "', res_name='"
+		. ((defined $name)? $name : 'undef') . "'";
+	if ( is_empty($name) or is_empty($delete_caldav_resource) ) {
+
+		my $msg = 'Name of the server and resource are required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
 	}
-	if ( $rowcount < 1 ) {
-		log_error 'Database: cannot delete resource - not found.';
-		print "Database: cannot delete resource - not found.\n";
-		exit 2;
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'delete from meqaris.meq_caldav_servers_resources where '
+		. 'calres_cals_id = (select cals_id from meqaris.meq_caldav_servers where cals_name = $1) '
+		. 'and calres_r_id = (select r_id from meqaris.meq_resources where r_name = $2)');
+	my $rowcount = $stmth->execute ($delete_caldav_resource, $name);
+	check_cmd_error ($dbh, $rowcount, 'unassign CalDAV resource', 'not found');
+	my $msg = "Resource '$name' successfully unassigned from CalDAV server '$delete_caldav_resource'.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $delete_caldav_server ) {
+
+	log_info "Command line: --delete-caldav-server: server_name='"
+		. ((defined $delete_caldav_server)? $delete_caldav_server : 'undef') . "'";
+	if ( is_empty($delete_caldav_server) ) {
+
+		my $msg = 'Name is required.';
+		log_error $msg;
+		print $msg . "\n";
+		exit 1;
 	}
-	$dbh->disconnect;
-	log_info "Resource '$delete' deleted successfully.";
-	print "Resource '$delete' deleted successfully.\n";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh,
+		'delete from meqaris.meq_caldav_servers where cals_name = $1');
+	my $rowcount = $stmth->execute ($delete_caldav_server);
+	check_cmd_error ($dbh, $rowcount, 'delete CalDAV server', 'not found');
+	my $msg = "CalDAV server '$delete_caldav_server' deleted successfully.";
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
@@ -346,19 +472,13 @@ if ( $destroy_db ) {
 
 	log_warn 'Command line: --destroy-db';
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	my $stmth = db_stmt ($dbh, 'drop schema meqaris cascade');
-	exit 2 unless $stmth;
+	my $dbh = db_connect_print();
+	my $stmth = db_stmt_print ($dbh, 'drop schema meqaris cascade');
 	$stmth->execute();
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot destroy the database schema: ' . $dbh->errstr;
-		print 'Database: cannot destroy the database schema: ' . $dbh->errstr . "\n";
-		exit 2;
-	}
-	$dbh->disconnect;
-	log_info 'Database schema deleted.';
-	print "Database schema deleted.\n";
+	check_cmd_error ($dbh, 1, 'destroy the database schema', 'unknown error');
+	my $msg = 'Database schema deleted.';
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
@@ -366,25 +486,15 @@ if ( $disable ) {
 
 	log_info "Command line: --disable: name='$disable'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'update meqaris.meq_resources set r_enabled = false where r_name = $1');
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute($disable);
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot disable resource: ' . $dbh->errstr;
-		print 'Database: cannot disable resource: ' . $dbh->errstr . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		log_error 'Database: cannot disable resource - not found.';
-		print "Database: cannot disable resource - not found.\n";
-		exit 2;
-	}
-	$dbh->disconnect;
-	log_info "Resource '$disable' disabled successfully.";
-	print "Resource '$disable' disabled successfully.\n";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_resources set r_enabled = false where r_name = $1');
+	$disable = clean_name ($disable);
+	my $rowcount = $stmth->execute ($disable);
+	check_cmd_error ($dbh, $rowcount, 'disable resource', 'not found');
+	my $msg = "Resource '$disable' disabled successfully.";
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
@@ -392,49 +502,63 @@ if ( $enable ) {
 
 	log_info "Command line: --enable: name='$enable'";
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'update meqaris.meq_resources set r_enabled = true where r_name = $1');
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute($enable);
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot enable resource: ' . $dbh->errstr;
-		print 'Database: cannot enable resource: ' . $dbh->errstr . "\n";
-		exit 2;
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_resources set r_enabled = true where r_name = $1');
+	$enable = clean_name ($enable);
+	my $rowcount = $stmth->execute ($enable);
+	check_cmd_error ($dbh, $rowcount, 'enable resource', 'not found');
+	my $msg = "Resource '$enable' enabled successfully.";
+	log_info $msg;
+	print $msg . "\n";
+	exit 0;
+}
+
+if ( $set ) {
+
+	log_info "Command line: --set: name='$set', value='"
+		. ((defined $value)? $value : 'undef') . "'";
+	if ( $set eq 'db_version' ) {
+
+		log_debug 'Attempting to modify a forbidden parameter';
+		exit 1;
 	}
-	if ( $rowcount < 1 ) {
-		log_error 'Database: cannot enable resource - not found.';
-		print "Database: cannot enable resource - not found.\n";
-		exit 2;
-	}
-	$dbh->disconnect;
-	log_info "Resource '$enable' enabled successfully.";
-	print "Resource '$enable' enabled successfully.\n";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $stmth = db_stmt_print ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
+	my $rowcount = $stmth->execute ($set, $value);
+	check_cmd_error ($dbh, $rowcount, 'modify setting', 'not found');
+	my $msg = "Setting '$set' modified successfully.";
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
 if ( $update ) {
 
-	log_info "Command line: --update: name='$name' email='$email' desc='$description'";
-	if ( $name eq '' and $email eq '' and $description eq '' ) {
+	log_info "Command line: --update: name='"
+		. ((defined $name)? $name : 'undef') . "', email='"
+		. ((defined $email)? $email : 'undef') . "', description='"
+		. ((defined $description)? $description : 'undef') . "'";
+	if ( is_empty($name) and is_empty($email) and is_empty($description) ) {
 
-		log_error 'Neither a new name, a new e-mail address or a new description have been provided.';
-		print "Neither a new name, a new e-mail address or a new description have been provided.\n";
+		my $msg = 'Neither a new name, a new e-mail address or a new description have been provided.';
+		log_error $msg;
+		print $msg . "\n";
 		exit 1;
 	}
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
 	my $sql = 'update meqaris.meq_resources set ';
 	my $first = 1;
 	my $par_cnt = 2;
 	my @values = ($update);
 	if ( $name ne '' ) {
 
+		$name = clean_name($name);
 		$sql .= "r_name = \$$par_cnt";
-		push @values, substr ($name, 0, 1000);
+		push @values, val_limit ($name);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -444,7 +568,7 @@ if ( $update ) {
 			$sql .= ', ';
 		}
 		$sql .= "r_email = \$$par_cnt";
-		push @values, substr ($email, 0, 1000);
+		push @values, val_limit ($email);
 		$first = 0;
 		$par_cnt++;
 	}
@@ -454,59 +578,103 @@ if ( $update ) {
 			$sql .= ', ';
 		}
 		$sql .= "r_description = \$$par_cnt";
-		push @values, substr ($description, 0, 1000);
+		push @values, val_limit ($description);
 		$first = 0;
 		$par_cnt++;
 	}
 
 	$sql .= ' where r_name = $1';
 
-	my $stmth = db_stmt ($dbh, $sql);
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute(@values);
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot update resource: ' . $dbh->errstr;
-		print 'Database: cannot update resource: ' . $dbh->errstr . "\n";
-		exit 2;
-	}
-	if ( $rowcount < 1 ) {
-		log_error 'Database: cannot enable resource - not found.';
-		print "Database: cannot enable resource - not found.\n";
-		exit 2;
-	}
-	$dbh->disconnect;
-	log_info "Resource '$update' updated successfully.";
-	print "Resource '$update' updated successfully.\n";
+	my $stmth = db_stmt_print ($dbh, $sql);
+	my $rowcount = $stmth->execute (@values);
+	check_cmd_error ($dbh, $rowcount, 'update resource', 'not found');
+	my $msg = "Resource '$update' updated successfully.";
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
-if ( $set ) {
+if ( $update_caldav_server ) {
 
-	log_info "Command line: --set: name='$set'";
-	if ( $set eq 'db_version' ) {
+	log_info "Command line: --update-caldav-server: name='"
+		. ((defined $update_caldav_server)? $update_caldav_server : 'undef') . "', new_name='"
+		. ((defined $name)? $name : 'undef') . "', user='"
+		. ((defined $user)? $user : 'undef') . "', realm='"
+		. ((defined $realm)? $realm : 'undef') . "', url='"
+		. ((defined $url)? $url : 'undef') . "'";
+	if ( is_empty($name) and is_empty($url) and is_empty($user) and is_empty($password) and is_empty($realm) ) {
 
-		log_debug 'Attempting to modify a forbidden parameter';
+		my $msg = 'None of the new parameters (name, URL, username, password, realm) have been provided.';
+		log_error $msg;
+		print $msg . "\n";
 		exit 1;
 	}
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	my $stmth = db_stmt ($dbh, 'update meqaris.meq_config set c_value = $2 where c_name = $1');
-	exit 2 unless $stmth;
-	my $rowcount = $stmth->execute($set, $value);
-	if ( $dbh->errstr ) {
-		log_error 'Database: cannot modify setting: ' . $dbh->errstr;
-		print 'Database: cannot modify setting: ' . $dbh->errstr . "\n";
-		exit 2;
+
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $sql = 'update meqaris.meq_caldav_servers set ';
+	my $first = 1;
+	my $par_cnt = 2;
+	my @values = ($update_caldav_server);
+	if ( !is_empty ($name) ) {
+
+		$name = clean_name($name);
+		$sql .= "cals_name = \$$par_cnt";
+		push @values, val_limit ($name);
+		$first = 0;
+		$par_cnt++;
 	}
-	if ( $rowcount < 1 ) {
-		log_error 'Database: cannot enable setting - not found.';
-		print "Database: cannot enable setting - not found.\n";
-		exit 2;
+	if ( !is_empty ($url) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_url = \$$par_cnt";
+		push @values, val_limit ($url);
+		$first = 0;
+		$par_cnt++;
 	}
-	$dbh->disconnect;
-	log_info "Setting '$set' modified successfully.";
-	print "Setting '$set' modified successfully.\n";
+	if ( !is_empty ($user) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_username = \$$par_cnt";
+		push @values, val_limit ($user);
+		$first = 0;
+		$par_cnt++;
+	}
+
+	if ( !is_empty ($password) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_password = \$$par_cnt";
+		push @values, val_limit ($password);
+		$first = 0;
+		$par_cnt++;
+	}
+
+	if ( !is_empty ($realm) ) {
+
+		if ( ! $first ) {
+			$sql .= ', ';
+		}
+		$sql .= "cals_realm = \$$par_cnt";
+		push @values, val_limit ($realm);
+		$first = 0;
+		$par_cnt++;
+	}
+
+	$sql .= ' where cals_name = $1';
+
+	my $stmth = db_stmt_print ($dbh, $sql);
+	my $rowcount = $stmth->execute (@values);
+	check_cmd_error ($dbh, $rowcount, 'update CalDAV server', 'not found');
+	my $msg = "CalDAV server '$update_caldav_server' updated successfully.";
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
 }
 
@@ -514,36 +682,47 @@ if ( $upgrade_db ) {
 
 	log_info 'Command line: --upgrade-db';
 
-	my $dbh = db_connect();
-	exit 2 unless $dbh;
-	exit 3 unless db_upgrade ($dbh);
-	$dbh->disconnect;
-	log_info 'Database upgraded successfully.';
-	print "Database upgraded successfully.\n";
+	my $dbh = db_connect_print();
+	db_upgrade_print ($dbh);
+	my $msg = 'Database upgraded successfully.';
+	log_info $msg;
+	print $msg . "\n";
 	exit 0;
+}
+
+sub check_cmd_error($$$$) {
+
+	my $dbh = shift;
+	my $rowcount = shift;
+	my $action = shift;
+	my $reason = shift;
+
+	if ( $dbh->errstr ) {
+		my $msg = "Database: cannot $action: " . $dbh->errstr;
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
+	if ( $rowcount < 1 ) {
+		my $msg = "Database: cannot $action ($reason).";
+		log_error $msg;
+		print $msg . "\n";
+		exit 2;
+	}
 }
 
 # ============================ Input processing ===================================
 
 log_trace 'Connecting to the database.';
-
 my $dbh = db_connect();
-if ( ! $dbh ) {
+exit 2 if ! $dbh;
 
-	dbunlock();
-	exit 2;
-}
 log_trace 'Checking if database upgrade needed.';
-
-if ( ! db_upgrade ($dbh) ) {
-
-	dbunlock();
-	exit 3;
-}
+exit 3 if ! db_upgrade ($dbh);
 
 log_trace 'Reading configuration from the database.';
 
-my $dbcfg = $dbh->selectall_hashref (db_stmt ($dbh, 
+my $dbcfg = $dbh->selectall_hashref (db_stmt ($dbh,
 	"select c_name, c_value from meqaris.meq_config where c_name <> 'db_version'"), 'c_name');
 
 if ( ! $dbcfg ) {
@@ -572,7 +751,6 @@ my $entity = $parser->parse(\*STDIN);
 if ( ! $entity ) {
 
 	log_fatal 'Standard input parsing failed: ' . $parser->last_error;
-	dbunlock();
 	exit 4;
 }
 
@@ -581,15 +759,21 @@ log_trace 'Standard input processed';
 my @parts = $entity->parts;
 
 my $sender = $entity->head->get('From', 0);
-chomp $sender;
 my $subject = $entity->head->get('Subject', 0);
+if ( is_empty($sender) or is_empty($subject) ) {
+
+	log_fatal 'Malformed input - the crucial "From" or "Subject" header is missing or is empty.';
+	exit 4;
+}
+chomp $sender;
 chomp $subject;
+
 my $reply_sender = '';
 my $response_type = '';
 
 log_info "New message from '$sender' with subject '$subject'.";
 
-my $res = $dbh->selectall_hashref (db_stmt ($dbh, 
+my $res = $dbh->selectall_hashref (db_stmt ($dbh,
 	'select r_id, r_name, r_email, r_enabled from meqaris.meq_resources'), 'r_email');
 if ( ! $res ) {
 
@@ -605,59 +789,73 @@ log_trace 'Processing message parts.';
 
 for my $p (@parts) {
 
-	if ( $p->mime_type eq 'text/calendar'
-		|| $p->mime_type eq 'application/ics' ) {
+	next unless $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics';
 
-		log_info "Message from '$sender' with subject '$subject' contains an iCalendar attachment.";
+	log_info "Message from '$sender' with subject '$subject' contains an iCalendar attachment.";
 
-		# bodyhandle() runs the decoding, as_string() doesn't
-		my $orig_invitation = $p->bodyhandle->as_string;
-		log_debug "Message from '$sender' with subject '$subject' contains this iCalendar:\n" .
-			"-----\n$orig_invitation\n------";
+	# bodyhandle() runs the decoding, as_string() doesn't
+	my $orig_invitation = $p->bodyhandle->as_string;
+	log_debug "Message from '$sender' with subject '$subject' contains this iCalendar:\n" .
+		"-----\n$orig_invitation\n------";
 
-		my $ical = Data::ICal->new(data => $orig_invitation);
+	my $ical = Data::ICal->new(data => $orig_invitation);
 
-		# Check the method property. ARRAY! List context required!
-		my ($method) = prop_array($ical, 'METHOD');
-		if ( val($method) ne 'REQUEST' and val($method) ne 'CANCEL' ) {
+	# Check the method property. ARRAY! List context required!
+	my ($method) = prop_array($ical, 'METHOD');
+	if ( val($method) ne 'REQUEST' and val($method) ne 'CANCEL' ) {
 
-			log_warn " Message from '$sender' with subject '$subject'" .
-				" contains an iCalendar, but its method '" .
-				val($method) . "' is unsupported. Skipping.";
+		log_warn " Message from '$sender' with subject '$subject'" .
+			" contains an iCalendar, but its method '" .
+			val($method) . "' is unsupported. Skipping.";
+		next;
+	}
+
+	# Read the time zones, if any:
+	log_trace 'Processing iCalendar time zones.';
+	my (%vtz, @vevents);
+	for my $entry (@{$ical->entries}) {
+
+		my $type = $entry->ical_entry_type;
+		if ( $type eq 'VEVENT' ) {
+
+			push @vevents, $entry;
+		}
+		elsif ( $type eq 'VTIMEZONE' ) {
+
+			my $dtz = DateTime::TimeZone::ICal->from_ical_entry($entry);
+			$vtz{$dtz->name} = $dtz;
+		}
+	}
+	log_trace 'Done processing iCalendar time zones. Processing events.';
+
+	my @response_details = ();
+	# Process events:
+	EV: for my $event (@vevents) {
+
+		Log::Log4perl::NDC->remove();
+		if ( ! defined ($event->property('uid')) ) {
+
+			log_warn 'Event contains no UID - ignoring.';
 			next;
 		}
+		my ($uid) = prop_array($event, 'uid');
+		Log::Log4perl::NDC->push(val ($uid));
+		log_trace 'Got UID.';
 
-		# Read the time zones, if any:
-		log_trace 'Processing iCalendar time zones.';
-		my (%vtz, @vevents);
-		for my $entry (@{$ical->entries}) {
+		if ( ! defined ($event->property('organizer')) ) {
 
-			my $type = $entry->ical_entry_type;
-			if ( $type eq 'VEVENT' ) {
-
-				push @vevents, $entry;
-			}
-			elsif ( $type eq 'VTIMEZONE' ) {
-
-				my $dtz = DateTime::TimeZone::ICal->from_ical_entry($entry);
-				$vtz{$dtz->name} = $dtz;
-			}
+			log_warn 'Event contains no organizer - ignoring.';
+			next;
 		}
-		log_trace 'Done processing iCalendar time zones. Processing events.';
+		my ($organizer) = prop_array($event, 'organizer');
+		my $organizer_mail = undef;
+		($organizer_mail = val($organizer)) =~ s/^mailto://io;
 
-		my @response_details = ();
-		# Process events:
-		EV: for my $event (@vevents) {
+		log_info "Got event with organizer='" . val ($organizer) . "'";
+		my $method_name = val ($method);
+		if ( $method_name eq 'REQUEST' ) {
 
-			Log::Log4perl::NDC->remove();
-			if ( ! defined ($event->property('uid')) ) {
-
-				log_warn 'Event contains no UID - ignoring.';
-				next;
-			}
-			my ($uid) = prop_array($event, 'uid');
-			Log::Log4perl::NDC->push(val ($uid));
-			log_trace 'Got UID.';
+			log_trace 'The iCalendar is a REQUEST.';
 
 			if ( ! defined ($event->property('attendee')) ) {
 
@@ -665,111 +863,99 @@ for my $p (@parts) {
 				next;
 			}
 
-			if ( ! defined ($event->property('organizer')) ) {
+			# Get the event properties. ARRAY! List context required!
+			my ($dtstart) = prop_array ($event, 'dtstart');
+			my ($dtend) = prop_array ($event, 'dtend');
+			my ($duration) = prop_array ($event, 'duration');
+			my ($dtstamp) = prop_array ($event, 'dtstamp');
+			my ($sequence) = prop_array ($event, 'sequence');
+			my ($summary) = prop_array ($event, 'summary');
 
-				log_warn 'Event contains no organizer - ignoring.';
-				next;
-			}
-			my ($organizer) = prop_array($event, 'organizer');
-			my $organizer_mail = undef;
-			($organizer_mail = val($organizer)) =~ s/^mailto://io;
+			# recurring events:
+			my ($exdates) = prop_array ($event, 'exdate');
+			my ($exrules) = prop_array ($event, 'exrule');
+			my ($rdates) = prop_array ($event, 'rdate');
+			my ($rrules) = prop_array ($event, 'rrule');
 
-			log_info "Got event with organizer='" . val ($organizer) . "'";
-			if ( val ($method) eq 'REQUEST' ) {
+			log_info "Event REQUEST: dtstart='" . val ($dtstart) .
+				"', dtend='" . val ($dtend) .
+				"', duration='" . val ($duration) .
+				"', dtstamp='" . val ($dtstamp).
+				"', sequence='" . val ($sequence) .
+				"', summary='" . val ($summary) . "'.";
 
-				log_trace 'The iCalendar is a REQUEST.';
+			log_trace 'Adding timezones to start date.';
 
-				# Get the event properties. ARRAY! List context required!
-				my ($dtstart) = prop_array ($event, 'dtstart');
-				my ($dtend) = prop_array ($event, 'dtend');
-				my ($duration) = prop_array ($event, 'duration');
-				my ($dtstamp) = prop_array ($event, 'dtstamp');
-				my ($sequence) = prop_array ($event, 'sequence');
-				my ($summary) = prop_array ($event, 'summary');
+			# Get the timezone ID from the parameters:
+			my $tzid_start = $dtstart->parameters->{'TZID'};
+			# Convert the dates to the timezone:
+			my $dt_start_conv = DateTime::Format::ICal->parse_datetime(val($dtstart));
 
-				# recurring events:
-				my ($exdates) = prop_array ($event, 'exdate');
-				my ($exrules) = prop_array ($event, 'exrule');
-				my ($rdates) = prop_array ($event, 'rdate');
-				my ($rrules) = prop_array ($event, 'rrule');
+			# The datetime is changed to be 'floating':
+			$dt_start_conv->set_time_zone($vtz{$tzid_start})
+				if $tzid_start and $vtz{$tzid_start};
 
-				log_info "Event REQUEST: dtstart='" . val ($dtstart) .
-					"', dtend='" . val ($dtend) .
-					"', duration='" . val ($duration) .
-					"', dtstamp='" . val ($dtstamp).
-					"', sequence='" . val ($sequence) .
-					"', summary='" . val ($summary) . "'.";
+			my $dt_end_conv = undef;
+			my $dates = undef;
+			my @rdates_periods = ();
+			my $dtstamp_conv = undef;
+			if ( defined ($dtend) ) {
 
-				log_trace 'Adding timezones to start date.';
+				log_trace 'Adding timezones to end date.';
 
-				# Get the timezone ID from the parameters:
-				my $tzid_start = $dtstart->parameters->{'TZID'};
+				my $tzid_end = $dtend->parameters->{'TZID'};
 				# Convert the dates to the timezone:
-				my $dt_start_conv = DateTime::Format::ICal->parse_datetime(val($dtstart));
-
+				$dt_end_conv = DateTime::Format::ICal->parse_datetime(val($dtend));
 				# The datetime is changed to be 'floating':
-				$dt_start_conv->set_time_zone($vtz{$tzid_start})
-					if $tzid_start and $vtz{$tzid_start};
+				$dt_end_conv->set_time_zone($vtz{$tzid_end})
+					if $tzid_end and $vtz{$tzid_end};
+			}
+			if ( defined ($dtstamp) ) {
 
-				my $dt_end_conv = undef;
-				my $dates = undef;
-				my @rdates_periods = ();
-				my $dtstamp_conv = undef;
-				if ( defined ($dtend) ) {
+				log_trace 'Adding timezones to date/timestamp.';
 
-					log_trace 'Adding timezones to end date.';
+				my $tzid_end = $dtstamp->parameters->{'TZID'};
+				# Convert the dates to the timezone:
+				$dtstamp_conv = DateTime::Format::ICal->parse_datetime(val($dtstamp));
+				# The datetime is changed to be 'floating':
+				$dtstamp_conv->set_time_zone($vtz{$tzid_end})
+					if $tzid_end and $vtz{$tzid_end};
+			}
+			if ( defined ($rdates) || defined ($rrules) ) {
 
-					my $tzid_end = $dtend->parameters->{'TZID'};
-					# Convert the dates to the timezone:
-					$dt_end_conv = DateTime::Format::ICal->parse_datetime(val($dtend));
-					# The datetime is changed to be 'floating':
-					$dt_end_conv->set_time_zone($vtz{$tzid_end})
-						if $tzid_end and $vtz{$tzid_end};
-				}
-				if ( defined ($dtstamp) ) {
+				log_trace 'Processing RRULE.';
 
-					log_trace 'Adding timezones to date/timestamp.';
-
-					my $tzid_end = $dtstamp->parameters->{'TZID'};
-					# Convert the dates to the timezone:
-					$dtstamp_conv = DateTime::Format::ICal->parse_datetime(val($dtstamp));
-					# The datetime is changed to be 'floating':
-					$dtstamp_conv->set_time_zone($vtz{$tzid_end})
-						if $tzid_end and $vtz{$tzid_end};
-				}
-				if ( defined ($rdates) || defined ($rrules) ) {
-
-					log_trace 'Processing RRULE.';
-
-					$dates = DateTime::Set->empty_set;
-					# add all the recursion rules and dates:
-					if ( defined ($rrules) ) {
-						for my $rrule ($rrules) {
-							$dates = $dates->union (
-								DateTime::Format::ICal->parse_recurrence (
-									recurrence => val ($rrule),
-									dtstart => $dt_start_conv)
-								);
-						}
+				$dates = DateTime::Set->empty_set;
+				# add all the recursion rules and dates:
+				if ( defined ($rrules) ) {
+					for my $rrule ($rrules) {
+						$dates = $dates->union (
+							DateTime::Format::ICal->parse_recurrence (
+								recurrence => val ($rrule),
+								dtstart => $dt_start_conv)
+							);
 					}
-					log_trace 'Processing RDATE.';
+				}
+				log_trace 'Processing RDATE.';
 
-					if ( defined ($rdates) ) {
-						for my $rdate ($rdates) {
-							my $rdate_val = val ($rdate);
-							next unless $rdate_val;
-							# Add only dates in RDATE here.
-							# Adding periods changes everything
-							# to DateTime::Span of zero length
-							# and breaks the DateTime::Set
-							if ( $rdate_val !~ m./.o ) {
+				if ( defined ($rdates) ) {
+					for my $rdate ($rdates) {
+						my $rdate_val = val ($rdate);
+						next unless $rdate_val;
+						# Add only dates in RDATE here.
+						# Adding periods changes everything
+						# to DateTime::Span of zero length
+						# and breaks the DateTime::Set
+						if ( $rdate_val !~ m./.o ) {
 
-								log_trace "Processing RDATE - date: '$rdate_val'.";
+							log_trace "Processing RDATE - date: '$rdate_val'.";
 
-								# not a period - parse a date
-								my $rdate_tzid = $rdate->parameters->{'TZID'};
-								my $rdate_parsed = DateTime::Format::ICal->parse_datetime($rdate_val);
+							# not a period - parse a date
+							my $rdate_tzid = $rdate->parameters->{'TZID'};
 
+							for my $rdate_part (split /,/o, $rdate_val) {
+
+								my $rdate_parsed = DateTime::Format::ICal->parse_datetime($rdate_part);
 								$rdate_parsed->set_time_zone($vtz{$rdate_tzid})
 									if $rdate_tzid and $vtz{$rdate_tzid};
 								$dates = $dates->union (
@@ -778,29 +964,38 @@ for my $p (@parts) {
 									)
 								);
 							}
-							else {
-								push @rdates_periods, DateTime::Format::ICal->parse_period ($rdate_val);
+						}
+						else {
+							for my $rdate_part (split /,/o, $rdate_val) {
+								push @rdates_periods, DateTime::Format::ICal->parse_period ($rdate_part);
 							}
 						}
 					}
-					log_trace 'Processing EXRULE.';
+				}
+				log_trace 'Processing EXRULE.';
 
-					# subtract all the exclusion rules and dates:
-					if ( defined ($exrules) ) {
-						for my $exrule ($exrules) {
-							$dates = $dates->complement (
-								DateTime::Format::ICal->parse_recurrence (
-									recurrence => val ($exrule),
-									dtstart => $dt_start_conv)
-								);
-						}
+				# subtract all the exclusion rules and dates:
+				if ( defined ($exrules) ) {
+					for my $exrule ($exrules) {
+						$dates = $dates->complement (
+							DateTime::Format::ICal->parse_recurrence (
+								recurrence => val ($exrule),
+								dtstart => $dt_start_conv)
+							);
 					}
-					log_trace 'Processing EXDATE.';
+				}
+				log_trace 'Processing EXDATE.';
 
-					if ( defined ($exdates) ) {
-						for my $exdate ($exdates) {
-							my $exdate_tzid = $exdate->parameters->{'TZID'};
-							my $exdate_parsed = DateTime::Format::ICal->parse_datetime(val ($exdate));
+				if ( defined ($exdates) ) {
+					for my $exdate ($exdates) {
+						my $exdate_val = val ($exdate);
+						next unless $exdate_val;
+						log_trace "Processing EXDATE - date: '$exdate_val'.";
+
+						my $exdate_tzid = $exdate->parameters->{'TZID'};
+						for my $exdate_part (split /,/o, $exdate_val) {
+
+							my $exdate_parsed = DateTime::Format::ICal->parse_datetime($exdate_part);
 
 							$exdate_parsed->set_time_zone($vtz{$exdate_tzid})
 								if $exdate_tzid and $vtz{$exdate_tzid};
@@ -812,582 +1007,520 @@ for my $p (@parts) {
 						}
 					}
 				}
-				log_trace 'Matching attendees to events.';
+			}
+			log_trace 'Matching attendees to events.';
 
-				# Find an attendee matching one of our resources
-				# and set the reply as ACCEPTED if the timeslot is free
-				# (if the database allows the insert) and DECLINED
-				# otherwise or on any error.
-				AT: for my $attendee (@{$event->property('attendee')}) {
+			# Find an attendee matching one of our resources
+			# and set the reply as ACCEPTED if the timeslot is free
+			# (if the database allows the insert) and DECLINED
+			# otherwise or on any error.
+			AT: for my $attendee (@{$event->property('attendee')}) {
 
-					# Get the raw e-mail address:
-					($reply_sender = val($attendee)) =~ s/^mailto://io;
-					# just one response per attendee:
-					if ( defined ($replied_attenddees{$reply_sender}) ) {
+				# Get the raw e-mail address:
+				($reply_sender = val($attendee)) =~ s/^mailto://io;
+				# just one response per attendee:
+				if ( defined ($replied_attenddees{$reply_sender}) ) {
 
-						log_info "Participant '$reply_sender' already replied, skipping.";
-						next;
+					log_info "Participant '$reply_sender' already replied, skipping.";
+					next;
+				}
+				if ( defined ($attendee->parameters->{'ROLE'})
+					&& $attendee->parameters->{'ROLE'} eq 'NON-PARTICIPANT' ) {
+
+					log_info "Participant '$reply_sender' is marked as NON-PARTICIPANT, skipping.";
+					next;
+				}
+				# possible values for CUTYPE: no CUTYPE, GROUP, ROOM, RESOURCE
+				@response_details = ();
+				my $updating = 0;
+				log_debug "Trying attendee '$reply_sender'.";
+				# Skip if not one of our resources:
+				if ( ! defined ($res->{$reply_sender}) ) {
+
+					log_debug "Attendee '$reply_sender' doesn't match any resource, skipping.";
+					next;
+				}
+				log_debug "Attendee '$reply_sender' found";
+				# check if resource is enabled:
+				if ( $res->{$reply_sender}->{'r_enabled'} ) {
+
+					log_debug "Attendee '$reply_sender' is enabled - proceeding.";
+
+					# locking required for toc-tou problems with
+					# invitations to multiple resources
+					# start transaction for the lock + check + DELETE + INSERT
+					$dbh->begin_work();
+					$updating = 1;
+					my $stmth = db_stmt ($dbh, 'lock table meqaris.meq_events in access exclusive mode');
+					if ( ! $stmth ) {
+						log_warn "Database: cannot lock table.\n"
+							. " Will continue, but concurrent booking of resources may give strange results.\n"
+							. "Database error:\n"
+							. $dbh->errstr;
 					}
-					if ( defined ($attendee->parameters->{'ROLE'})
-						&& $attendee->parameters->{'ROLE'} eq 'NON-PARTICIPANT' ) {
-
-						log_info "Participant '$reply_sender' is marked as NON-PARTICIPANT, skipping.";
-						next;
+					$stmth->execute();
+					if ( $dbh->errstr ) {
+						log_warn "Database: cannot lock table.\n"
+							. " Will continue, but concurrent booking of resources may give strange results.\n"
+							. "Database error:\n"
+							. $dbh->errstr;
 					}
-					# possible values for CUTYPE: no CUTYPE, GROUP, ROOM, RESOURCE
-					@response_details = ();
-					my $updating = 0;
-					log_debug "Trying attendee '$reply_sender'.";
-					# Skip if not one of our resources:
-					if ( ! defined ($res->{$reply_sender}) ) {
+					log_trace 'Checking if an event with this UID already exists.';
 
-						log_debug "Attendee '$reply_sender' doesn't match.";
-						next;
-					}
-					log_debug "Attendee '$reply_sender' found";
-					# check if resource is enabled:
-					if ( $res->{$reply_sender}->{'r_enabled'} ) {
+					# Attendee found and enabled. Check if this is an update.
+					# NOTE: we MUST check the e-mail, otherwise the same UID can cause
+					# skipping adding the same event to other resources!
+					my @values_find_del = (val ($uid), $reply_sender, defined ($dtstamp_conv)? $dtstamp_conv : undef);
+					my @old_events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems not to work
+						db_stmt ($dbh, 'select e_id, e_organiser, coalesce (e_seq, 0) as e_seq,'
+							. ' e_dtstamp, cast (coalesce ($3, \'19700101T010101Z\') as timestamp with time zone) as new_dtstamp'
+							. ' from meqaris.meq_events'
+							. ' join meqaris.meq_resource_reservations on rr_e_id = e_id'
+							. ' join meqaris.meq_resources on r_id = rr_r_id'
+							. ' where e_uid = $1 and r_email = $2'),
+						{ Slice => {} }, @values_find_del) };
+					for my $old_event (@old_events) {
 
-						log_debug "Attendee '$reply_sender' is enabled - proceeding.";
+						log_debug 'Event already exists - checking if this is an update.';
 
-						# locking required for toc-tou problems with
-						# invitations to multiple resources
-						# start transaction for the lock + check + DELETE + INSERT
-						$dbh->begin_work();
-						$updating = 1;
-						my $stmth = db_stmt ($dbh, 'lock table meqaris.meq_resource_reservations in access exclusive mode');
-						if ( ! $stmth ) {
-							log_warn "Database: cannot lock table.\n"
-								. " Will continue, but concurrent booking of resources may give strange results.\n"
-								. "Database error:\n"
-								. $dbh->errstr;
+						# an update can imply changing a resource, so do not check the resource ID!
+						#if ( defined ($old_event->{'rr_r_id'})
+						#	&& $res->{$reply_sender}->{'r_id'} == $old_event->{'rr_r_id'} ) {
+
+							log_debug 'Old dtstamp=' . (defined ($old_event->{'e_dtstamp'})?
+								$old_event->{'e_dtstamp'} : 'null');
+							log_debug 'New dtstamp=' . (defined ($old_event->{'new_dtstamp'})?
+								$old_event->{'new_dtstamp'} : 'null');
+
+							# best to compare DB strings, otherwise e.g. '2022-05-19 17:31:52+02' vs. '20220519T153152Z'
+							if ( defined ($old_event->{'e_dtstamp'})
+								&& defined ($old_event->{'new_dtstamp'})
+								&& $old_event->{'e_dtstamp'} ge $old_event->{'new_dtstamp'} ) {
+
+								log_debug 'Same or earlier DTSTAMP - this is a re-send or a duplicate, NOT an update.' .
+									' Can be an invitation sent to multiple resources. Skipping.';
+								next EV;
+							}
+
+							log_debug 'Old seq=' . (defined ($old_event->{'e_seq'})? $old_event->{'e_seq'} : 'null');
+							log_debug 'New seq=' . (defined ($sequence)? val ($sequence) : 'undef');
+							if ( defined ($old_event->{'e_seq'})
+								&& defined ($sequence)
+								&& int(val ($sequence)) <= $old_event->{'e_seq'} ) {
+
+								log_debug 'Same or earlier sequence number - this is a re-send or a duplicate, NOT an update.' .
+									' Can be an invitation sent to multiple resources. Skipping.';
+								next EV;
+							}
+						#}
+
+						log_info 'This event is an update.';
+						# check if the sender is the organizer and decline if not
+						my $sender_mail = get_sender_mail();
+						log_trace "Checking sender vs. event's organizer.";
+						if ( $sender_mail ne $organizer_mail ) {
+
+							log_info "Sender '$sender_mail' is not event's organizer '$organizer_mail' - declining.";
+							push @response_details, 'Declined for security reasons.';
+							push @response_details, 'You are not the organizer of the attached event.';
+							push @response_details, "The attached event's organizer is '$organizer_mail'.";
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
+							next AT;
 						}
-						$stmth->execute();
-						if ( $dbh->errstr ) {
-							log_warn "Database: cannot lock table.\n"
-								. " Will continue, but concurrent booking of resources may give strange results.\n"
-								. "Database error:\n"
-								. $dbh->errstr;
+						log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
+						$old_event->{'e_organiser'} =~ s/^mailto://io;
+						if ( $sender_mail ne $old_event->{'e_organiser'} ) {
+
+							log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
+								$old_event->{'e_organiser'} . "' - declining.";
+							push @response_details, 'Declined for security reasons.';
+							push @response_details, 'You are not the organizer of the updated event.';
+							push @response_details, "The updated event's original organizer is '$organizer_mail'.";
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
+							next AT;
 						}
-						log_trace 'Checking if an event with this UID already exists.';
+						log_debug "Sender '$sender_mail' is the same organizer as in the database. Deleting old event.";
+						$dberr = undef;
+						my $stmth = db_stmt ($dbh,
+							'delete from meqaris.meq_events ' .
+							'where e_id = $1');
+						if ( $stmth ) {
+							@values_find_del = ($old_event->{'e_id'});
+							$stmth->execute(@values_find_del);
+							if ( $dbh->errstr ) {
 
-						# Attendee found and enabled. Check if this is an update.
-						my @values_find_del = (val ($uid), $reply_sender, defined ($dtstamp_conv)? $dtstamp_conv : undef);
-						my @old_events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems not to work
-							db_stmt ($dbh, 'select rr_id, rr_r_id, rr_organiser, coalesce (rr_seq, 0) as rr_seq, lower(rr_interval) as rr_dstart,'
-								. ' rr_dtstamp, cast (coalesce ($3, \'19700101T010101Z\') as timestamp with time zone) as new_dtstamp'
-								. ' from meqaris.meq_resource_reservations'
-								. ' join meqaris.meq_resources on r_id = rr_r_id'
-								. ' where rr_uid = $1 and r_email = $2'),
-							{ Slice => {} }, @values_find_del) };
-						for my $old_event (@old_events) {
-
-							log_debug 'Event already exists - checking if this is an update.';
-
-							# an update can imply changing a resource, so do not check resource ID!
-							#if ( defined ($old_event->{'rr_r_id'})
-							#	&& $res->{$reply_sender}->{'r_id'} == $old_event->{'rr_r_id'} ) {
-
-								log_debug 'Old dtstamp=' . (defined ($old_event->{'rr_dtstamp'})?
-									$old_event->{'rr_dtstamp'} : 'null');
-								log_debug 'New dtstamp=' . (defined ($old_event->{'new_dtstamp'})?
-									$old_event->{'new_dtstamp'} : 'null');
-
-								# best to compare DB strings, otherwise e.g. '2022-05-19 17:31:52+02' vs. '20220519T153152Z'
-								if ( defined ($old_event->{'rr_dtstamp'})
-									&& defined ($old_event->{'new_dtstamp'})
-									&& $old_event->{'rr_dtstamp'} ge $old_event->{'new_dtstamp'} ) {
-
-									log_debug 'Same or earlier DTSTAMP - this is a re-send or a duplicate, NOT an update.' .
-										' Can be an invitation sent to multiple resources. Skipping.';
-									next EV;
-								}
-
-								log_debug 'Old seq=' . (defined ($old_event->{'rr_seq'})? $old_event->{'rr_seq'} : 'null');
-								log_debug 'New seq=' . (defined ($sequence)? val ($sequence) : 'undef');
-								if ( defined ($old_event->{'rr_seq'})
-									&& defined ($sequence)
-									&& int(val ($sequence)) <= $old_event->{'rr_seq'} ) {
-
-									log_debug 'Same or earlier sequence number - this is a re-send or a duplicate, NOT an update.' .
-										' Can be an invitation sent to multiple resources. Skipping.';
-									next EV;
-								}
-							#}
-
-							log_info 'This event is an update.';
-							# check if the sender is the organizer and decline if not
-							my $sender_mail;
-							if ( $sender =~ /<([^>]+)>/o ) {
-								$sender_mail = $1;
-							}
-							else {
-								$sender_mail = $sender;
-							}
-							log_trace "Checking sender vs. event's organizer.";
-							if ( $sender_mail ne $organizer_mail ) {
-
-								log_info "Sender '$sender_mail' is not event's organizer '$organizer_mail' - declining.";
-								$dbh->rollback if $updating;
-								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-								push @response_details, 'Declined for security reasons.';
-								push @response_details, 'You are not the organizer of the attached event.';
-								push @response_details, "The attached event's organizer is '$organizer_mail'.";
-								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
-								next AT;
-							}
-							log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
-							$old_event->{'rr_organiser'} =~ s/^mailto://io;
-							if ( $sender_mail ne $old_event->{'rr_organiser'} ) {
-
-								log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
-									$old_event->{'rr_organiser'} . "' - declining.";
-								$dbh->rollback if $updating;
-								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-								push @response_details, 'Declined for security reasons.';
-								push @response_details, 'You are not the organizer of the updated event.';
-								push @response_details, "The updated event's original organizer is '$organizer_mail'.";
-								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
-								next AT;
-							}
-							log_debug "Sender '$sender_mail' is the same organizer as in the database. Deleting old event.";
-							$dberr = undef;
-							my $stmth = db_stmt ($dbh,
-								'delete from meqaris.meq_resource_reservations ' .
-								'where rr_id = $1');
-							if ( $stmth ) {
-								@values_find_del = ($old_event->{'rr_id'});
-								$stmth->execute(@values_find_del);
-								if ( $dbh->errstr ) {
-
-									$dberr = $dbh->errstr;
-								}
-								else {
-									log_info 'Old event deleted successfully.';
-									last; # go insert the new one
-								}
-							}
-							else {
 								$dberr = $dbh->errstr;
 							}
-							if ( $dberr ) {
-								log_error "Error deleting old event:\n" .
-									$dberr;
-								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-								push @response_details, 'Unable to delete the event being updated.';
-								push @response_details, "The database error is:\n" . $dberr;
-								$dbh->rollback if $updating;
-								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
-								next AT;
+							else {
+								log_info 'Old event deleted successfully.';
+								#last; # delete EVERY old event we're updating
 							}
-						} # for my $old_event (@old_events)
-						# Try to insert the new event:
-						log_info 'Inserting new event';
-						$stmth = undef;
-						my @values_insert = undef;
-						if ( defined ($rdates) || defined ($rrules) ) {
+						}
+						else {
+							$dberr = $dbh->errstr;
+						}
+						if ( $dberr ) {
+							log_error "Error deleting old event:\n" . $dberr;
+							push @response_details, 'Unable to delete the event being updated.';
+							push @response_details, "The database error is:\n" . $dberr;
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
+							next AT;
+						}
+					} # for my $old_event (@old_events)
+					# Try to insert the new event:
+					log_info 'Inserting new event';
+					$stmth = db_stmt ($dbh,
+						'insert into meqaris.meq_events (e_organiser, e_summary, e_dtstamp, e_uid, e_seq, e_data) '
+						. 'values ($1, $2, $3, $4, $5, $6) returning e_id');
+					if ( $stmth ) {
 
-							log_trace 'RDATE or RRULE defined - building recurring events.';
+						$stmth->execute(
+							val_limit ($organizer_mail),
+							val_limit (val ($summary)),
+							$dtstamp_conv,
+							val_limit (val ($uid)),
+							(defined ($sequence))? $sequence->value : 0,
+							encode_base64 ($orig_invitation)
+						);
+						if ( $dbh->errstr ) {
 
-							#if ( ! defined ($dates->count()) ) { # works only for DateTime::Set
-							if ( $dates->max->isa('DateTime::Infinite::Future') ) { # works for DateTime::Set and DateTime::SpanSet (for periods)
+							$processed = process_insert_error ($event, $attendee,
+								$organizer_mail, $updating, $reply_sender);
+							next AT;
+						}
+					}
+					else {
+						$processed = process_insert_error ($event, $attendee,
+							$organizer_mail, $updating, $reply_sender);
+						next AT;
+					}
+					my $e_id = $stmth->fetch()->[0];
+					if ( ! defined ($e_id) ) {
 
-								log_info 'The event has an infinite number of occurrences - declining.';
-								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-								push @response_details, 'The event has an infinite number of occurrences. Please specify either a finite number of occurrences or an ending date.';
-								$dbh->rollback if $updating;
-								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
+						$processed = process_insert_error ($event, $attendee,
+							$organizer_mail, $updating, $reply_sender);
+						next AT;
+					}
 
-								$replied_attenddees{$reply_sender} = 1;
-								next AT; # decline by each attendee
-							}
-							# start transaction for the INSERTs if not in one already
-							$dbh->begin_work() if ! $updating;
-							$updating = 1;
-							my $was_err = 0;
+					$stmth = undef;
+					my @values_insert = undef;
+					my $was_err = 0;
+					if ( defined ($rdates) || defined ($rrules) ) {
 
-							# process periods in RDATE separately,
-							# otherwise it breaks the DateTime::Set
-							for my $period (@rdates_periods) {
-								next unless $period;
-								log_trace 'Recurring event - RDATE period - inserting intervals.';
+						log_trace 'RDATE or RRULE defined - building recurring events.';
 
-								$stmth = db_stmt ($dbh,
-									'insert into meqaris.meq_resource_reservations ' .
-									'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-									'values ($1, $2, $3, $4, $5, $6, $7, $8)');
-								@values_insert = (
-									$res->{$reply_sender}->{'r_id'},
-									'[' . $period->start . ',' . $period->end . ')',
-									substr ($organizer_mail, 0, 1000),
-									substr (val ($summary), 0, 1000),
-									$dtstamp_conv,
-									substr (val ($uid), 0, 1000),
-									(defined ($sequence))? $sequence->value : 0,
-									encode_base64 ($orig_invitation)
-									);
-								if ( $stmth ) {
+						#if ( ! defined ($dates->count()) ) { # works only for DateTime::Set
+						if ( $dates->max->isa('DateTime::Infinite::Future') ) { # works for DateTime::Set and DateTime::SpanSet (for periods)
 
-									$stmth->execute(@values_insert);
-									if ( $dbh->errstr ) {
+							log_info 'The event has an infinite number of occurrences - declining.';
+							push @response_details, 'The event has an infinite number of occurrences. Please specify either a finite number of occurrences or an ending date.';
+							$processed = send_decline ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details);
+							next AT; # decline by each attendee
+						}
+						# start transaction for the INSERTs if not in one already
+						$dbh->begin_work() if ! $updating;
+						$updating = 1;
 
-										log_error "Error inserting new recurring event:\n" .
-											$dbh->errstr . "\n - declining.";
-										# DB error - decline
-										$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-										push @response_details, 'Unable to insert the event.';
-										if ( $dbh->errstr =~ /rr_interval_excl/o ) {
-											push @response_details, 'The resource is booked in the selected period.';
-										}
-										elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
-											push @response_details, 'You tried to create an event in the past.';
-										}
-										push @response_details, "The database error is:\n" . $dbh->errstr;
-										$dbh->rollback if $updating;
-										$processed = send_mail ($event, $reply_sender,
-											'Declined', \@response_details);
+						# process periods in RDATE separately,
+						# otherwise it breaks the DateTime::Set
+						for my $period (@rdates_periods) {
+							next unless $period;
+							log_trace 'Recurring event - RDATE period - inserting intervals.';
 
-										$replied_attenddees{$reply_sender} = 1;
-										$was_err = 1;
-										last;
-									}
-								}
-								else {
-									log_error "Error inserting new recurring event:\n" .
-										$dbh->errstr . "\n- declining.";
-									# DB error - decline
-									$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-									push @response_details, 'Unable to insert the event.';
-									push @response_details, "The database error is:\n" . $dbh->errstr;
-									$dbh->rollback if $updating;
-									$processed = send_mail ($event, $reply_sender,
-										'Declined', \@response_details);
+							$stmth = db_stmt ($dbh,
+								'insert into meqaris.meq_resource_reservations ' .
+								'(rr_r_id, rr_interval, rr_e_id) ' .
+								'values ($1, $2, $3)');
+							@values_insert = (
+								$res->{$reply_sender}->{'r_id'},
+								'[' . $period->start . ',' . $period->end . ')',
+								$e_id);
+							if ( $stmth ) {
 
-									$replied_attenddees{$reply_sender} = 1;
+								$stmth->execute(@values_insert);
+								if ( $dbh->errstr ) {
+
+									$processed = process_insert_error ($event, $attendee,
+										$organizer_mail, $updating, $reply_sender);
 									$was_err = 1;
 									last;
 								}
 							}
-							if ( ! $was_err ) {
-								my $iter = $dates->iterator;
-								while ( my $dt = $iter->next ) {
-
-									if ( defined ($dt_end_conv) ) {
-
-										log_trace 'Recurring event - DTEND defined - inserting intervals.';
-
-										# calculate each end by adding the
-										# event's interval 'dtend - dtstart'
-										# to each event occurrence's start
-										$stmth = db_stmt ($dbh,
-											'insert into meqaris.meq_resource_reservations ' .
-											'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-											'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + (cast ($4 as timestamp with time zone) - cast ($3 as timestamp with time zone))) || \')\' as tstzrange)), ' .
-											'$5, $6, $7, $8, $9, $10)');
-										@values_insert = (
-											$res->{$reply_sender}->{'r_id'},
-											$dt->stringify,
-											$dt_start_conv,
-											$dt_end_conv,
-											substr ($organizer_mail, 0, 1000),
-											substr (val ($summary), 0, 1000),
-											$dtstamp_conv,
-											substr (val ($uid), 0, 1000),
-											(defined ($sequence))? $sequence->value : 0,
-											encode_base64 ($orig_invitation)
-											);
-									}
-									elsif ( defined ($duration) ) {
-
-										log_trace 'Recurring event - DTEND not defined but DURATION defined - building intervals using DURATION.';
-
-										$stmth = db_stmt ($dbh,
-											'insert into meqaris.meq_resource_reservations ' .
-											'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-											'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
-											'$4, $5, $6, $7, $8, $9)');
-										@values_insert = (
-											$res->{$reply_sender}->{'r_id'},
-											$dt->stringify,
-											val ($duration),
-											substr ($organizer_mail, 0, 1000),
-											substr (val ($summary), 0, 1000),
-											$dtstamp_conv,
-											substr (val ($uid), 0, 1000),
-											(defined ($sequence))? $sequence->value : 0,
-											encode_base64 ($orig_invitation)
-											);
-									}
-									else {
-										log_info 'Neither DTEND nor DURATION defined in a recurring event. Declining anniversary-type event or an event that takes no time.';
-
-										$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-										push @response_details, 'This event takes no time, so it needs no resources.';
-										push @response_details, 'Neither DTEND nor DURATION specified.';
-										$dbh->rollback if $updating;
-										$processed = send_mail ($event, $reply_sender,
-											'Declined', \@response_details);
-
-										$replied_attenddees{$reply_sender} = 1;
-										next AT;
-									}
-									if ( $stmth ) {
-
-										$stmth->execute(@values_insert);
-										if ( $dbh->errstr ) {
-
-											log_error "Error inserting new recurring event:\n" .
-												$dbh->errstr . "\n - declining.";
-											# DB error - decline
-											$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-											push @response_details, 'Unable to insert the event.';
-											if ( $dbh->errstr =~ /rr_interval_excl/o ) {
-												push @response_details, 'The resource is booked in the selected period.';
-											}
-											elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
-												push @response_details, 'You tried to create an event in the past.';
-											}
-											push @response_details, "The database error is:\n" . $dbh->errstr;
-											$dbh->rollback if $updating;
-											$processed = send_mail ($event, $reply_sender,
-												'Declined', \@response_details);
-
-											$replied_attenddees{$reply_sender} = 1;
-											$was_err = 1;
-											last;
-										}
-									}
-									else {
-										log_error "Error inserting new recurring event:\n" .
-											$dbh->errstr . "\n- declining.";
-										# DB error - decline
-										$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-										push @response_details, 'Unable to insert the event.';
-										push @response_details, "The database error is:\n" . $dbh->errstr;
-										$dbh->rollback if $updating;
-										$processed = send_mail ($event, $reply_sender,
-											'Declined', \@response_details);
-
-										$replied_attenddees{$reply_sender} = 1;
-										$was_err = 1;
-										last;
-									}
-								}
-							}
-							if ( ! $was_err ) {
-
-								log_info "Inserted recurring event for attendee '$reply_sender'.";
-
-								$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
-								$dbh->commit if $updating;
-								$processed = send_mail ($event, $reply_sender,
-									'Accepted', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
-							}
-							# NOTE: recurring event inserted - do not proceed with the normal!
-							next AT;
-						}
-						elsif ( defined ($dt_end_conv) ) {
-
-							log_trace 'DTEND defined - inserting interval directly.';
-
-							$stmth = db_stmt ($dbh,
-								'insert into meqaris.meq_resource_reservations ' .
-								'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-								'values ($1, $2, $3, $4, $5, $6, $7, $8)');
-							@values_insert = (
-								$res->{$reply_sender}->{'r_id'},
-								"[$dt_start_conv, $dt_end_conv)",
-								substr ($organizer_mail, 0, 1000),
-								substr (val ($summary), 0, 1000),
-								$dtstamp_conv,
-								substr (val ($uid), 0, 1000),
-								(defined ($sequence))? $sequence->value : 0,
-								encode_base64 ($orig_invitation)
-								);
-						}
-						elsif ( defined ($duration) ) {
-
-							log_trace 'DTEND not defined but DURATION defined - building interval using DURATION.';
-
-							$stmth = db_stmt ($dbh,
-								'insert into meqaris.meq_resource_reservations ' .
-								'(rr_r_id, rr_interval, rr_organiser, rr_summary, rr_dtstamp, rr_uid, rr_seq, rr_data) ' .
-								'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
-								'$4, $5, $6, $7, $8, $9)');
-							@values_insert = (
-								$res->{$reply_sender}->{'r_id'},
-								$dt_start_conv,
-								val ($duration),
-								substr ($organizer_mail, 0, 1000),
-								substr (val ($summary), 0, 1000),
-								$dtstamp_conv,
-								substr (val ($uid), 0, 1000),
-								(defined ($sequence))? $sequence->value : 0,
-								encode_base64 ($orig_invitation)
-								);
-						}
-						else {
-							log_info 'None of: DTEND, DURATION, RDATE or RRULE defined. Declining anniversary-type event or an event that takes no time.';
-
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-							push @response_details, 'This event takes no time, so it needs no resources.';
-							push @response_details, 'None of: DTEND, DURATION, RDATE or RRULE specified.';
-							$dbh->rollback if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								'Declined', \@response_details);
-
-							$replied_attenddees{$reply_sender} = 1;
-							next AT;
-						}
-						if ( $stmth ) {
-
-							$stmth->execute(@values_insert);
-							if ( $dbh->errstr ) {
-
-								log_error "Error inserting new event:\n" .
-									$dbh->errstr . "\n- declining.";
-								# DB error - decline
-								$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-								push @response_details, 'Unable to insert the event.';
-								if ( $dbh->errstr =~ /rr_interval_excl/o ) {
-									push @response_details, 'The resource is booked in the selected period.';
-								}
-								elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
-									push @response_details, 'You tried to create an event in the past.';
-								}
-								push @response_details, "The database error is:\n" . $dbh->errstr;
-								$dbh->rollback if $updating;
-								$processed = send_mail ($event, $reply_sender,
-									'Declined', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
-								next AT;
-							}
 							else {
-								log_info "Inserted for attendee '$reply_sender'.";
-								$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
-								$dbh->commit if $updating;
-								$processed = send_mail ($event, $reply_sender,
-									'Accepted', \@response_details);
-
-								$replied_attenddees{$reply_sender} = 1;
-								next AT;
+								$processed = process_insert_error ($event, $attendee,
+									$organizer_mail, $updating, $reply_sender);
+								$was_err = 1;
+								last;
 							}
 						}
-						else {
-							log_error "Error inserting new event:\n" .
-								$dbh->errstr . "\n- declining.";
-							# DB error - decline
-							$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-							push @response_details, 'Unable to insert the event.';
-							push @response_details, "The database error is:\n" . $dbh->errstr;
-							$dbh->rollback if $updating;
-							$processed = send_mail ($event, $reply_sender,
-								'Declined', \@response_details);
+						if ( ! $was_err ) {
+							my $iter = $dates->iterator;
+							my $next = 0;
+							my $last = 0;
+							my %params = (
+								dt_start_conv => $dt_start_conv,
+								dt_end_conv => $dt_end_conv,
+								duration => $duration, # MUST pass as-is for the 'defined' test
+								e_id => $e_id,
+								event => $event,
+								attendee => $attendee,
+								organizer_mail => $organizer_mail,
+								updating => $updating
+							);
+							while ( my $dt = $iter->next ) {
 
-							$replied_attenddees{$reply_sender} = 1;
-							next AT;
+								$params{start_string} = $dt->stringify;
+								($processed, $was_err, $next, $last) = insert_event (%params);
+								next AT if $next;
+								last if $last;
+							}
 						}
-					}
-					else {
-						log_info 'Resource disabled - declining.';
-						# Attendee disabled - decline
-						$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
-						push @response_details, 'The resource you selected has been disabled.';
-						$dbh->rollback if $updating;
-						$processed = send_mail ($event, $reply_sender,
-							'Declined', \@response_details);
-						$replied_attenddees{$reply_sender} = 1;
+						if ( ! $was_err ) {
+
+							log_info "Inserted recurring event for attendee '$reply_sender'.";
+							$processed = send_accept ($event, $attendee, $organizer_mail,
+								$updating, $reply_sender, \@response_details, val ($uid));
+						}
+						# NOTE: recurring event inserted - do not proceed with the normal!
 						next AT;
 					}
-				} # for my $attendee
-			} # 'REQUEST'
-			elsif ( val ($method) eq 'CANCEL' ) {
+					else {
+						my $next = 0;
+						my %params = (
+							dt_start_conv => $dt_start_conv,
+							dt_end_conv => $dt_end_conv,
+							duration => $duration, # MUST pass as-is for the 'defined' test
+							e_id => $e_id,
+							event => $event,
+							attendee => $attendee,
+							organizer_mail => $organizer_mail,
+							updating => $updating
+						);
+						($processed, $was_err, $next, undef) = insert_event (%params);
+						next AT if $next;
+					}
+					if ( ! $was_err ) {
 
-				log_info 'The iCalendar is a CANCEL.';
-
-				# Cancellation request - check if the event
-				# exists, check if sender is the organiser
-				# and if the organiser in the cancellation
-				# request is the organiser of the original event
-				if ( ! defined ($uid) ) {
-
-					# should never be entered
-					log_warn 'Event UID not defined, cannot delete - ignoring.';
-					next;
-				}
-				log_trace 'Comparing sender and organizer e-mail addresses.';
-				my $sender_mail;
-				if ( $sender =~ /<([^>]+)>/o ) {
-					$sender_mail = $1;
+						log_info "Inserted for attendee '$reply_sender'.";
+						$processed = send_accept ($event, $attendee, $organizer_mail,
+							$updating, $reply_sender, \@response_details, val ($uid));
+						next AT;
+					}
 				}
 				else {
-					$sender_mail = $sender;
+					# Attendee disabled - decline
+					log_info 'Resource disabled - declining.';
+					push @response_details, 'The resource you selected has been disabled.';
+					$processed = send_decline ($event, $attendee, $organizer_mail,
+						$updating, $reply_sender, \@response_details);
+					next AT;
 				}
-				if ( $sender_mail ne $organizer_mail ) {
+			} # for my $attendee
+		} # 'REQUEST'
+		elsif ( $method_name eq 'CANCEL' ) {
 
-					log_info "Sender '$sender_mail' is not event's organizer '$organizer_mail' - ignoring.";
-					next;
-				}
-				log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
-				my @values_cancel = (val ($uid));
-				log_trace 'Searching the database for the event to cancel.';
-				my @events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems NOT to work
-					db_stmt ($dbh, 'select rr_id, rr_organiser from meqaris.meq_resource_reservations where rr_uid = $1'),
-					{ Slice => {} }, @values_cancel) };
-				if (! defined ($events[0]{'rr_id'}) ) {
+			log_info 'The iCalendar is a CANCEL.';
 
-					log_info 'Event not found in database - ignoring.';
-					next;
-				}
-				log_trace 'Event found in the database.';
-				$events[0]{'rr_organiser'} =~ s/^mailto://io;
-				if ( $sender_mail ne $events[0]{'rr_organiser'} ) {
+			# Cancellation request - check if the event
+			# exists, check if sender is the organiser
+			# and if the organiser in the cancellation
+			# request is the organiser of the original event
+			if ( ! defined ($uid) ) {
 
-					log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
-						$events[0]{'rr_organiser'} . "' - ignoring.";
-					next;
-				}
-				log_trace 'Event sender is the organizer. Deleting the event.';
-				my $sql = 'delete from meqaris.meq_resource_reservations where rr_uid = $1';
+				# should never be entered
+				log_warn 'Event UID not defined, cannot delete - ignoring.';
+				next;
+			}
+			log_trace 'Comparing sender and organizer e-mail addresses.';
+			my $sender_mail = get_sender_mail();
+			if ( $sender_mail ne $organizer_mail ) {
+
+				log_info "Sender '$sender_mail' is not event's organizer '$organizer_mail' - ignoring.";
+				next;
+			}
+			log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
+			my @values_cancel = (val ($uid));
+			log_trace 'Searching the database for the event to cancel.';
+			my @events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems NOT to work
+				db_stmt ($dbh, 'select e_id, e_organiser from meqaris.meq_events where e_uid = $1'),
+				{ Slice => {} }, @values_cancel) };
+			if (! defined ($events[0]{'e_id'}) ) {
+
+				log_info 'Event not found in database - ignoring.';
+				next;
+			}
+			log_trace 'Event found in the database.';
+			$events[0]{'e_organiser'} =~ s/^mailto://io;
+			if ( $sender_mail ne $events[0]{'e_organiser'} ) {
+
+				log_info "Sender '$sender_mail' is not the same organizer as in the database '" .
+					$events[0]{'e_organiser'} . "' - ignoring.";
+				next;
+			}
+			log_trace 'Event sender is the organizer. Deleting the event.';
+			my $sql = '';
+			my $event_status = '';
+			my ($recurr_id) = prop_array ($event, 'RECURRENCE-ID');
+			if ( defined ($event->property('STATUS')) ) {
+
+				my @ev_status = prop_array($event, 'STATUS');
+				$event_status = val ($ev_status[0]);
+				log_trace "STATUS = '$event_status'.";
+			}
+			log_trace 'CalDAV: reading servers by UID for deleting.';
+			my $caldav_servers = $dbh->selectall_arrayref (db_stmt ($dbh,
+				'select distinct cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers '
+				. 'join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id '
+				. 'join meqaris.meq_resources on r_id = calres_r_id '
+				. 'join meqaris.meq_resource_reservations on rr_r_id = r_id '
+				. 'join meqaris.meq_events on e_id = rr_e_id '
+				. 'where e_uid = $1'
+				), { Slice => {} }, (val ($uid)));
+			if ( $event_status eq 'CANCELLED' ) {
+				# CANCELLED status means to cancel all
+				$sql = 'delete from meqaris.meq_events where e_uid = $1'; # foreign key cascades this
 				@values_cancel = (val ($uid));
-				my ($recurr_id) = prop_array ($event, 'RECURRENCE-ID');
+			}
+			else {
+				$sql = 'delete from meqaris.meq_resource_reservations where rr_e_id in '
+					. '(select e_id from meqaris.meq_events where e_uid = $1)';
+				@values_cancel = (val ($uid));
 				if ( defined ($recurr_id) ) {
 
+					log_trace 'Deleting just a RECURRENCE-ID.';
 					# add the recurrence ID of a single instance to delete
 					$sql .= ' and lower(rr_interval) = $2';
 					push @values_cancel, val ($recurr_id);
 				}
-				my $stmth = db_stmt ($dbh, $sql);
-				if ( $stmth ) {
-					$stmth->execute(@values_cancel);
-					if ( $dbh->errstr ) {
-						log_error "Error deleting event:\n" .
-							$dbh->errstr;
-					}
-					else {
-						log_info 'Event deleted successfully.';
+				if ( defined ($event->property('attendee'))
+					# CANCELLED status means to cancel all
+					&& !(defined ($event_status) && $event_status eq 'CANCELLED')) {
+
+					log_trace 'Deleting just for the specified attendees.';
+					my @attendees = @{$event->property('attendee')};
+					if ( @attendees > 0 ) {
+						# Named attendees present - delete the
+						# event just for them and not for all
+						$sql .= ' and rr_r_id in (select r_id from meqaris.meq_resources where r_email in (';
+						for my $attendee (@attendees) {
+
+							# Get the raw e-mail address:
+							($reply_sender = val($attendee)) =~ s/^mailto://io;
+							log_trace "Deleting for '$reply_sender'.";
+							$sql .= "'" . $reply_sender . "',";
+						}
+						$sql =~ s/,$//o;
+						$sql .= '))';
 					}
 				}
-				else {
-					log_error "Error deleting event:\n" .
+			}
+
+			my $stmth = db_stmt ($dbh, $sql);
+			if ( $stmth ) {
+				$stmth->execute(@values_cancel);
+				if ( $dbh->errstr ) {
+					log_error "Error deleting event from the database:\n" .
 						$dbh->errstr;
 				}
-			} # 'CANCEL'
-		} # event loop
-	} # $p->mime_type eq 'text/calendar' || $p->mime_type eq 'application/ics'
+				else {
+					log_info 'Event deleted successfully from the database.';
+					# notify CalDAV
+					if ( $event_status eq 'CANCELLED' ) {
+						log_trace 'Deleting the whole event from CalDAV.';
+						notify_caldav ('DEL', $event, undef,
+							val ($uid), $caldav_servers);
+					}
+					else {
+						# partial delete
+						if ( defined ($event->property('attendee')) ) {
+							my @attendees = @{$event->property('attendee')};
+							if ( @attendees > 0 ) {
+								# Named attendees present - delete the
+								# event just for them and not for all
+								for my $attendee (@attendees) {
+
+									# Get the raw e-mail address:
+									($reply_sender = val($attendee)) =~ s/^mailto://io;
+									log_trace "Deleting from CalDAV for '$reply_sender'.";
+									if ( ! defined ($recurr_id) ) {
+										notify_caldav ('DEL', $event,
+											$reply_sender, val ($uid),
+											$caldav_servers);
+									}
+									else {
+										# Delete just the occurrence.
+										# NOTE: sending an iCalendar with METHOD:CANCEL
+										# doesn't work, so we simply add an EXDATE
+										if ( ! defined ($event->property('EXDATE')) ) {
+
+											my $tzid_recurr = $recurr_id->parameters->{'TZID'};
+											if ( defined ($tzid_recurr) ) {
+												$event->add_property( 'EXDATE' => [
+													val ($recurr_id),
+													{ 'TZID' => $tzid_recurr } ] );
+											}
+											else {
+												$event->add_property('EXDATE', val ($recurr_id));
+											}
+										}
+										else {
+											my @new_values = ();
+											my $exd_values = $event->property('EXDATE')->[0]->value;
+											if ( ref $exd_values ) {
+												@new_values = @{$exd_values};
+											}
+											else {
+												push @new_values, $exd_values;
+											}
+											my $recurr_val = val ($recurr_id);
+											push @new_values, $recurr_val;
+											# fixed later, in notify_caldav()
+											$event->property('EXDATE')->[0]->value(
+												join ',', @new_values);
+										}
+										#undef($event->properties->{'RECURRENCE-ID'});
+										#undef($event->properties->{'RECURRENCE-ID'}->[0]);
+										# remove RECURRENCE-ID - works only this way:
+										my $ical_str = $ical->as_string;
+										$ical_str =~ s/RECURRENCE-ID.*[\r\n]+//o;
+										my $del_ical = Data::ICal->new(
+											rfc_strict => 1, data => $ical_str);
+										for my $entry (@{$del_ical->entries}) {
+
+											my $type = $entry->ical_entry_type;
+											if ( $type eq 'VEVENT' ) {
+
+												my ($caldav_ret, undef)
+													= notify_caldav ('PUT', $entry,
+														$reply_sender, val ($uid),
+														$caldav_servers);
+												last;
+											}
+										}
+									}
+								}
+							}
+							else {
+								log_info 'Attendees empty - deleting the whole event from CalDAV.';
+								notify_caldav ('DEL', $event, undef, val ($uid), $caldav_servers);
+							}
+						}
+						else {
+							log_info 'Attendees not defined - deleting the whole event from CalDAV.';
+							notify_caldav ('DEL', $event, undef, val ($uid), $caldav_servers);
+						}
+					}
+				}
+			}
+			else {
+				log_error "Error deleting event from the database:\n" . $dbh->errstr;
+			}
+		} # 'CANCEL'
+	} # event loop
 	# Process just one invitation per each e-mail. Various mail clients
 	# may send the same invitation using different MIME types, so reply
 	# to just the first one successfully processed and stop processing
@@ -1395,10 +1528,11 @@ for my $p (@parts) {
 	last if $processed;
 }
 
-$dbh->disconnect;
-$parser->filer->purge;
-dbunlock();
-
+END {
+	$dbh->disconnect if $dbh;
+	$parser->filer->purge if $parser;
+	dbunlock();
+}
 exit 0;
 
 # ============================ Subroutines: ===================================
@@ -1414,9 +1548,13 @@ sub print_help {
 			"Author: Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net.\n\n" .
 			"Syntax: meqaris [options]\n\n" .
 			"Options:\n" .
+			"--add-caldav-resource <caldav_server_name>\tAssign the given CalDAV server to the resource given in --name\n" .
+			"--add-caldav-server <URL>\tAdd a CalDAV server with --name and optional --user, --password and --realm\n" .
 			"--conf <file>\t\t\tUse the given configuration file\n" .
 			"--create <name>\t\t\tCreate a new meeting resource\n" .
 			"--delete <name>\t\t\tDelete a meeting resource with the given name\n" .
+			"--delete-caldav-resource <caldav_server_name>\tUn-assign the given CalDAV server from the resource given in --name\n" .
+			"--delete-caldav-server <caldav_server_name>\tDelete the CalDAV server with the given name\n" .
 			"--description <desc>\t\tSpecifies a description for a meeting resource when creating or updating\n" .
 			"--destroy-db\t\t\tDestroys the Meqaris schema on the database\n" .
 			"--disable <name>\t\tDisables the meeting resource with the given name\n" .
@@ -1424,11 +1562,16 @@ sub print_help {
 			"--enable <name>\t\t\tEnables the meeting resource with the given name\n" .
 			"-h|--help|-?\t\t\tShows this help message\n" .
 			"--license|licence\t\tShows the license information\n" .
-			"--name <name>\t\t\tSpecifies a new name for the meeting resource when updating\n" .
+			"--name <name>\t\t\tSpecifies a name for the meeting resource or CalDAV server\n" .
+			"--password <password>\t\tSpecifies a password when creating or updating a CalDAV server\n" .
+			"--realm <realm_name>\t\tSpecifies a realm when creating or updating a CalDAV server\n" .
 			"--set <name>\t\t\tSpecifies the name of the configuration setting to modify\n" .
 			"--status\t\t\tShows the operability status of Meqaris\n" .
 			"--update <name>\t\t\tUpdate a meeting resource with the given name\n" .
+			"--update-caldav-server <caldav_server_name>\tUpdate a CalDAV server with a new --url / --name / --user / --password / --realm\n" .
 			"--upgrade-db\t\t\tRun the necessary Meqaris database structure upgrade scripts\n" .
+			"--url <URL>\t\t\tSpecifies an URL for the CalDAV server when updating\n" .
+			"--user <username>\t\tSpecifies a username when creating or updating a CalDAV server\n" .
 			"--value <value>\t\t\tSpecifies the new value of the configuration setting to modify using --set\n" .
 			"--version\t\t\tDisplay Meqaris version information\n"
 		;
@@ -1436,14 +1579,15 @@ sub print_help {
 
 # ============================ send_mail ===================================
 
-sub send_mail ($$$@) {
+sub send_mail ($$$$@) {
 
 	my $event = shift;
 	my $from = shift;
+	my $organizer_mail = shift;
 	my $response_type = shift;
 	my $response_details = shift;
 
-	log_debug "Preparing response '$response_type: $subject' from '$from' to '$sender'";
+	log_debug "Preparing response '$response_type: $subject' from '$from' to '$organizer_mail' and Cc '$sender'";
 
 	my $from_full = "<$from>";
 	if ( defined ($res) && defined ($res->{$from}) && defined ($res->{$from}->{'r_name'}) ) {
@@ -1453,7 +1597,7 @@ sub send_mail ($$$@) {
 
 	my $calendar_reply = Data::ICal->new(rfc_strict => 1);
 	$calendar_reply->add_entry($event);
-	$calendar_reply->add_property('PRODID', "Meqaris $meqaris_version - https://meqaris.sourceforge.io/");
+	$calendar_reply->add_property('PRODID', 'Meqaris - https://meqaris.sourceforge.io/');
 	$calendar_reply->add_property('METHOD', 'REPLY');
 
 	my @mail_lines = ("$response_type: $subject\n");
@@ -1463,16 +1607,18 @@ sub send_mail ($$$@) {
 			push @mail_lines, $response_details->[$i] . "\n" if defined ($response_details->[$i]);
 		}
 	}
-	push @mail_lines, ("-- \n", "Generated by Meqaris version $meqaris_version\n", "https://meqaris.sourceforge.io/\n");
+	push @mail_lines, ("-- \n", "Generated by Meqaris\n", "https://meqaris.sourceforge.io/\n");
+	my $response_subject = substr ("$response_type: $subject", 0, 78); # length - rfc2822
 	my $mail = MIME::Entity->build (
 		#Type => 'multipart/mixed', # set automatically
 		From => $from_full,
-		To => $sender,
-		Subject => substr ("$response_type: $subject", 0, 78), # length - rfc2822
+		To => $organizer_mail,
+		Cc => $sender,
+		Subject => $response_subject,
 		Encoding => 'quoted-printable',
 		Data => \@mail_lines
 	);
-	$mail->head->add('Comments', "Generated by Meqaris version $meqaris_version - https://meqaris.sourceforge.io/");
+	$mail->head->add('Comments', 'Generated by Meqaris - https://meqaris.sourceforge.io/');
 	$mail->attach(
 		Data => $calendar_reply->as_string,
 		Type => 'text/calendar; method=REPLY',
@@ -1486,17 +1632,25 @@ sub send_mail ($$$@) {
 		my $mail_command = $dbcfg->{'mail_command'}->{'c_value'};
 		if ( ! is_empty ($mail_command) ) {
 
-			# remove any pipe symbols first:
+			# remove any pipe symbols first, but only from the beginning:
 			$mail_command =~ s/^\s*\|\s*//o;
-			log_info "Sending response to '$sender' using command '$mail_command'";
-			open (my $cmd, '|-', $mail_command);
-			if ( ! $cmd ) {
+			# substitute any parameters in the command:
+			$mail_command =~ s/%from%/$from/gi;
+			$mail_command =~ s/%to%/$organizer_mail/gi;
+			$mail_command =~ s/%cc%/$sender/gi;
+			$mail_command =~ s/%subject%/$response_subject/gi;
+			$mail_command =~ s/%action%/$response_type/gi;
+			log_info "Sending response to '$organizer_mail' and Cc '$sender' using command '$mail_command'";
+			if ( open (my $cmd, '|-', $mail_command) ) {
+
+				print $cmd $mail->stringify;
+				close $cmd;
+				return 1;
+			}
+			else {
 				log_warn "Mail_sending_method = mail_command, but the command failed to run: $!." .
 					' Cannot send the response.';
 			}
-			print $cmd $mail->stringify;
-			close $cmd;
-			return 1;
 		}
 		else {
 			log_warn 'Mail_sending_method = mail_command, but mail_command was not defined.' .
@@ -1507,15 +1661,15 @@ sub send_mail ($$$@) {
 		# send by mail (the default)
 		my %send_cfg = (
 			MailFrom => $from_full,
-			To => $sender);
+			To => $organizer_mail,
+			Cc => $sender);
 		my $mail_server = $dbcfg->{'mail_server'}->{'c_value'};
 		my $mail_server_port = $dbcfg->{'mail_server_port'}->{'c_value'};
 		$send_cfg{Host} = $mail_server if ! is_empty ($mail_server);
 		$send_cfg{Port} = $mail_server_port if ! is_empty ($mail_server_port);
 		$send_cfg{Debug} = 1 if defined ($logger) && $logger->is_trace (); # prints to screen
 
-		log_info "Sending response to '$sender' using " .
-			"mail_server:port='" .
+		log_info "Sending response to '$organizer_mail' and Cc '$sender' using mail_server:port='" .
 			(defined ($mail_server)? $mail_server : '(default)') .
 			':' . (defined ($mail_server_port)? $mail_server_port : '(default port)') ."'";
 		$mail->smtpsend(%send_cfg);
@@ -1524,12 +1678,340 @@ sub send_mail ($$$@) {
 	return 0;
 }
 
+# ============================ send_accept ===================================
+
+sub send_accept ($$$$$$$) {
+
+	my $event = shift;
+	my $attendee = shift;
+	my $organizer_mail = shift;
+	my $updating = shift;
+	my $reply_sender = shift;
+	my $response_details = shift;
+	my $uid = shift;
+
+	$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+	$dbh->commit if $updating;
+	my ($caldav_ret, $caldav_response_details)
+		= notify_caldav ('PUT', $event, $reply_sender, $uid, undef);
+	push @{$response_details}, @{$caldav_response_details} if $caldav_ret != 1;
+	my $processed = send_mail ($event, $reply_sender,
+		$organizer_mail, 'Accepted', $response_details);
+
+	$replied_attenddees{$reply_sender} = 1;
+	return $processed;
+}
+
+# ============================ send_decline ===================================
+
+sub send_decline ($$$$$$) {
+
+	my $event = shift;
+	my $attendee = shift;
+	my $organizer_mail = shift;
+	my $updating = shift;
+	my $reply_sender = shift;
+	my $response_details = shift;
+
+	$dbh->rollback if $updating;
+	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+	my $processed = send_mail ($event, $reply_sender,
+		$organizer_mail, 'Declined', $response_details);
+
+	$replied_attenddees{$reply_sender} = 1;
+	return $processed;
+}
+
+# ============================ process_insert_error ===================================
+
+sub process_insert_error($$$$$) {
+
+	my $event = shift;
+	my $attendee = shift;
+	my $organizer_mail = shift;
+	my $updating = shift;
+	my $reply_sender = shift;
+
+	my @response_details = ();
+
+	log_error "Error inserting new event:\n" . $dbh->errstr . "\n- declining.";
+	push @response_details, 'Unable to insert the event.';
+	if ( $dbh->errstr =~ /rr_interval_excl/o ) {
+		push @response_details, 'The resource is booked in the selected period.';
+	}
+	elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
+		push @response_details, 'You tried to create an event in the past.';
+	}
+	push @response_details, "The database error is:\n" . $dbh->errstr;
+	my $processed = send_decline ($event, $attendee, $organizer_mail,
+		$updating, $reply_sender, \@response_details);
+
+	$replied_attenddees{$reply_sender} = 1;
+	return $processed;
+}
+
+# ============================ insert_event ===================================
+
+sub insert_event (\%) {
+
+	my $params = shift;
+	my @response_details = ();
+	my $processed = 0;
+	my $was_err = 0;
+	my $next = 0;
+	my $last = 0;
+	my @values_insert = ();
+	my $stmth;
+
+	if ( defined ($params->{'start_string'}) && ! defined ($params->{'duration'}) ) {
+
+		log_trace 'DTEND defined - inserting recurring intervals.';
+
+		# calculate each end by adding the
+		# event's interval 'dtend - dtstart'
+		# to each event occurrence's start
+		$stmth = db_stmt ($dbh,
+			'insert into meqaris.meq_resource_reservations ' .
+			'(rr_r_id, rr_interval, rr_e_id) ' .
+			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + (cast ($4 as timestamp with time zone) - cast ($3 as timestamp with time zone))) || \')\' as tstzrange)), ' .
+			'$5)');
+		@values_insert = ($res->{$reply_sender}->{'r_id'},
+			$params->{'start_string'},
+			$params->{'dt_start_conv'},
+			$params->{'dt_end_conv'},
+			$params->{'e_id'});
+	}
+	elsif ( defined ($params->{'dt_end_conv'}) ) {
+
+		log_trace 'DTEND defined - inserting interval directly.';
+
+		$stmth = db_stmt ($dbh,
+			'insert into meqaris.meq_resource_reservations ' .
+			'(rr_r_id, rr_interval, rr_e_id) ' .
+			'values ($1, $2, $3)');
+		@values_insert = ($res->{$reply_sender}->{'r_id'},
+			"[$params->{'dt_start_conv'}, $params->{'dt_end_conv'})",
+			$params->{'e_id'});
+	}
+	elsif ( defined ($params->{'duration'}) ) {
+
+		log_trace 'DTEND not defined but DURATION defined - building intervals using DURATION.';
+
+		$stmth = db_stmt ($dbh,
+			'insert into meqaris.meq_resource_reservations ' .
+			'(rr_r_id, rr_interval, rr_e_id) ' .
+			'values ($1, (select cast (\'[\' || $2 || \',\' || (select cast ($2 as timestamp with time zone) + cast ($3 as interval)) || \')\' as tstzrange)), ' .
+			'$4)');
+		@values_insert = ($res->{$reply_sender}->{'r_id'},
+			defined ($params->{'start_string'})? $params->{'start_string'} : $params->{'dt_start_conv'},
+			val ($params->{'duration'}),
+			$params->{'e_id'});
+	}
+	else {
+		my $msg = 'Neither DTEND nor DURATION defined in a recurring event or none of: '
+			.'DTEND, DURATION, RDATE or RRULE defined.';
+		log_info $msg . ' Declining anniversary-type event or an event that takes no time.';
+
+		push @response_details, 'This event takes no time, so it needs no resources.';
+		push @response_details, $msg;
+		$processed = send_decline ($params->{'event'}, $params->{'attendee'},
+			$params->{'organizer_mail'}, $params->{'updating'},
+			$reply_sender, \@response_details);
+		$next = 1;
+	}
+	if ( $stmth ) {
+
+		$stmth->execute(@values_insert);
+		if ( $dbh->errstr ) {
+
+			$processed = process_insert_error ($params->{'event'},
+				$params->{'attendee'}, $params->{'organizer_mail'},
+				$params->{'updating'}, $reply_sender);
+			$was_err = 1;
+			$last = 1;
+		}
+	}
+	else {
+		$processed = process_insert_error ($params->{'event'},
+			$params->{'attendee'}, $params->{'organizer_mail'},
+			$params->{'updating'}, $reply_sender);
+		$was_err = 1;
+		$last = 1;
+	}
+	return ($processed, $was_err, $next, $last);
+}
+
+# ============================ notify_caldav ===================================
+
+sub notify_caldav ($$$$$) {
+
+	my $type = shift;
+	my $event = shift;
+	my $reply_sender = shift;
+	my $uid = shift;
+	my $caldav_servers = shift;
+
+	my @response_details = ();
+	my $result = 0;
+	my $ret = 0;
+
+	log_trace 'CalDAV: notifying servers.';
+	# Send the whole event to CalDAV servers for the resource
+	my $err_msg = 'CalDAV: Some servers could not have been notified.';
+	my $stmth;
+	my @stmt_params = ();
+	if ( defined ($reply_sender) ) { # add/delete by resource
+
+		log_debug "CalDAV: resource defined: '$reply_sender'.";
+		$stmth = db_stmt ($dbh,
+			'select cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers '
+			. 'join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id '
+			. 'join meqaris.meq_resources on r_id = calres_r_id '
+			. 'where r_email = $1'
+			);
+		push @stmt_params, $reply_sender;
+		log_trace 'CalDAV: reading servers.';
+		$caldav_servers = $dbh->selectall_arrayref ($stmth,
+			{ Slice => {} }, @stmt_params);
+		if ( $dbh->errstr ) {
+
+			log_warn $err_msg . " Database error:\n" . $dbh->errstr;
+			push @response_details, $err_msg;
+			push @response_details, 'Cannot read CalDAV servers connected to the resource.';
+			push @response_details, "Database error:\n" . $dbh->errstr;
+		}
+	}
+	if ( defined ($caldav_servers) ) {
+
+		log_trace 'CalDAV: got list of servers. Length: ' . (scalar @{$caldav_servers});
+		my $caldav_string = '';
+		if ( $type eq 'PUT' ) {
+
+			my $caldav_entry = Data::ICal->new (rfc_strict => 1);
+			$caldav_entry->add_property('METHOD', 'REQUEST'); # even for deleting single occurrences
+			$caldav_entry->add_entry ($event);
+			$caldav_string = $caldav_entry->as_string;
+			# Need to have just one EXDATE (for compatibility), but
+			# Data::ICal::Property->value() accepts only 1 value and
+			# escapes any commas inside, so remove escape backslashes
+			# from EXDATE - works only this way. Some CalDAV servers
+			# turn it into separate entries anyway, which defeats the
+			# purpose (we can do this ourselves), but at least we do what we can:
+			while ($caldav_string =~ /(EXDATE.*)\\,(.*[\r\n]+)/o) {
+				$caldav_string =~ s/(EXDATE.*)\\,(.*[\r\n]+)/$1,$2/;
+			}
+			log_debug "CalDAV: will send this iCalendar:\n" . $caldav_string unless (scalar @{$caldav_servers}) == 0;
+		}
+		for my $server (@{$caldav_servers}) {
+
+			my $conn = HTTP::DAV->new();
+			if (! is_empty ($server->{'cals_username'})
+				&& ! is_empty ($server->{'cals_password'})
+				&& ! is_empty ($server->{'cals_realm'})
+			) {
+				log_trace "CalDAV: Using user='$server->{'cals_username'}' and realm='$server->{'cals_realm'}'.";
+				$conn->credentials(
+					-user  => $server->{'cals_username'},
+					-pass  => $server->{'cals_password'},
+					-realm => $server->{'cals_realm'},
+					-url   => $server->{'cals_url'}
+					);
+			}
+			elsif (! is_empty ($server->{'cals_username'})
+				&& ! is_empty ($server->{'cals_password'})
+			) {
+				log_trace "CalDAV: Using user='$server->{'cals_username'}'.";
+				$conn->credentials(
+					-user  => $server->{'cals_username'},
+					-pass  => $server->{'cals_password'},
+					-url   => $server->{'cals_url'}
+					);
+			}
+			else {
+				log_trace 'CalDAV: Using just the URL.';
+				$conn->credentials(-url => $server->{'cals_url'});
+			}
+			log_debug "CalDAV: Opening URL: '$server->{'cals_url'}'.";
+			if (! $conn->open (-url => $server->{'cals_url'})) {
+
+				log_warn $err_msg . " Cannot connect to CalDAV server '$server->{'cals_url'}'."
+					. " CalDAV error:\n" . $conn->message;
+				push @response_details, $err_msg;
+				push @response_details, "Cannot connect to CalDAV server '$server->{'cals_url'}'.";
+				push @response_details, "CalDAV error:\n" . $conn->message;
+				next;
+			}
+			if ( $type eq 'PUT' ) {
+
+				log_trace "CalDAV: Using PUT.";
+				$result = $conn->put(-local => \$caldav_string, -url => $server->{'cals_url'} . '/' . $uid . '.ics');
+			}
+			elsif ( $type eq 'DEL' ) {
+
+				log_trace "CalDAV: Using DELETE.";
+				$result = $conn->delete(-url => $server->{'cals_url'} . '/' . $uid . '.ics');
+			}
+			if (! $result) {
+
+				log_warn $err_msg . " Cannot send/delete data to/from CalDAV server '$server->{'cals_url'}'."
+					. " CalDAV error:\n" . $conn->message;
+				push @response_details, $err_msg;
+				push @response_details, "Cannot send/delete data to/from CalDAV server '$server->{'cals_url'}'.";
+				push @response_details, "CalDAV error:\n" . $conn->message;
+				my $add_details = '';
+				my $response = $conn->get_last_response();
+				if ( $response->is_multistatus() ) {
+
+					for (my $i = 0; $i < $response->response_count(); $i++) {
+
+						my ($err_code, $dav_err_msg, $url, $desc)
+							= $response->response_bynum($i);
+						$add_details .= "$url: $err_code: $dav_err_msg\n";
+					}
+				}
+				else {
+					$add_details .= $response->as_string() . "\n";
+				}
+				my $msg = "CalDAV messages:\n" . $add_details;
+				log_warn $msg;
+				push @response_details, $msg;
+			}
+			else {
+				log_trace "CalDAV: Success.";
+				$ret = 1;
+			}
+		}
+	}
+	else {
+		log_warn $err_msg . " Database error:\n" . $dbh->errstr;
+		push @response_details, $err_msg;
+		push @response_details, 'Cannot read CalDAV servers connected to the resource.';
+		push @response_details, "Database error:\n" . $dbh->errstr;
+	}
+	return ($ret, \@response_details);
+}
+
 # ============================ val ===================================
 
 sub val ($) {
 
 	my $prop = shift;
 	return (defined ($prop)? $prop->value : '(undef)');
+}
+
+sub val_limit ($) {
+
+	my $prop = shift;
+	return (defined ($prop)? substr ($prop, 0, 1000) : undef);
+}
+
+# ============================ clean_name ===================================
+
+sub clean_name ($) {
+
+	$name = shift;
+	$name =~ s/[^a-z0-9_.\-@\/\\#$%&*()\[\];', ]/_/gi;
+	return $name;
 }
 
 # ============================ prop_array ===================================
@@ -1550,11 +2032,28 @@ sub is_empty ($) {
 	return ((defined ($v) && $v ne '')? 0 : 1);
 }
 
+# ============================ get_sender_mail ===================================
+
+sub get_sender_mail {
+
+	my $sender_mail;
+	if ( $sender =~ /<([^>]+)>/o ) {
+		$sender_mail = $1;
+	}
+	else {
+		$sender_mail = $sender;
+	}
+	return $sender_mail;
+}
 # ============================ db_connect ===================================
 
 sub db_connect {
 
 	my $dbtype = $inicfg{'meqaris.dbtype'};
+	if ( ! defined($dbtype) ) {
+		log_fatal 'Database: cannot connect: missing "dbtype" parameter';
+		return undef;
+	}
 	my $conn_timeout = 30;
 	$conn_timeout = $inicfg{"$dbtype.connect_timeout"} unless is_empty ($inicfg{"$dbtype.connect_timeout"});
 
@@ -1572,6 +2071,17 @@ sub db_connect {
 	return $dbh;
 }
 
+sub db_connect_print {
+
+	my $dbh = db_connect();
+	if ( ! $dbh ) {
+
+		print 'Database: cannot connect: ' . ((defined $DBI::errstr)? $DBI::errstr : '') . "\n";
+		exit 2;
+	}
+	return $dbh;
+}
+
 # ============================ db_stmt ===================================
 
 sub db_stmt ($$) {
@@ -1581,6 +2091,19 @@ sub db_stmt ($$) {
 	my $stmth = $dbh->prepare ($sql);
 	if ( ! $stmth ) {
 		log_fatal 'Database: cannot create statement: ' . $dbh->errstr;
+	}
+	return $stmth;
+}
+
+sub db_stmt_print ($$) {
+
+	my $dbh = shift;
+	my $sql = shift;
+	my $stmth = db_stmt($dbh, $sql);
+	if ( ! $stmth ) {
+
+		print "Database: cannot create statement. See the logs.\n";
+		exit 2;
 	}
 	return $stmth;
 }
@@ -1609,23 +2132,25 @@ sub db_run_file ($$) {
 	my $dbh = shift;
 	my $filename = shift;
 
-	open (my $f, '<', $filename);
-	if ( ! defined ($f) ) {
+	my $f = undef;
+	if ( ! open ($f, '<', $filename) ) {
 
-		log_fatal "Database upgrade: cannot open file '$filename': $!";
-		print "Database upgrade: cannot open file '$filename': $!". "\n";
+		my $msg = "Database upgrade: cannot open file '$filename': $!";
+		log_fatal $msg;
+		print $msg. "\n";
 		return 0;
 	}
-	my @lines = <$f>;
+	my $file_contents = join("\n", <$f>);
 	close $f;
 
-	my $stmth = db_stmt ($dbh, join ("\n", @lines));
+	my $stmth = db_stmt ($dbh, $file_contents);
 	return 0 unless $stmth;
 	$stmth->execute();
 	if ( $dbh->errstr ) {
 
-		log_fatal "Database upgrade: cannot execute file '$filename': " . $dbh->errstr;
-		print "Database upgrade: cannot execute file '$filename': " . $dbh->errstr . "\n";
+		my $msg = "Database upgrade: cannot execute file '$filename': " . $dbh->errstr;
+		log_fatal $msg;
+		print $msg . "\n";
 		return 0;
 	}
 	return 1;
@@ -1647,13 +2172,15 @@ sub db_upgrade ($) {
 
 			# new database - just run the full script (in a transaction)
 			$dbh->begin_work();
-			if (! db_run_file ($dbh, "$inicfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
+			if (db_run_file ($dbh, "$inicfg{'meqaris.datadir'}/sql/meqaris-full.pgsql") ) {
 
+				$dbh->commit();
+			}
+			else {
 				log_fatal "Can't update database version to $meqaris_dbversion.";
 				$dbh->rollback();
 				$ret = 0;
 			}
-			$dbh->commit();
 		}
 		elsif ($db_ver < $meqaris_dbversion) {
 
@@ -1684,6 +2211,18 @@ sub db_upgrade ($) {
 	return $ret;
 }
 
+sub db_upgrade_print ($) {
+
+	my $dbh = shift;
+	my $res = db_upgrade($dbh);
+	if ( ! $res ) {
+
+		print "Database: cannot upgrade. See the logs.\n";
+		exit 3;
+	}
+	return $res;
+}
+
 # ============================ Locking ===================================
 
 my $lock_filename = undef;
@@ -1703,23 +2242,20 @@ sub dblock () {
 	$lock_filename = "$lockdir/meqaris.lck";
 	log_trace 'Trying to file-lock.';
 
-	sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT);
-	if ( ! defined ($lock_fd) ) {
-		my $start_time = time;
+	if ( ! sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT) ) {
 
+		my $start_time = time;
 		log_trace 'Waiting for lock';
 
 		while ( time < $start_time + 30 ) {
 
-			sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT);
-			if ( defined ($lock_fd) ) {
+			if ( sysopen (my $lock_fd, $lock_filename, O_WRONLY | O_EXCL | O_CREAT) ) {
 
 				close $lock_fd; # the file itself is not needed, as long as it exists
 				last;
 			}
 			sleep 1;
 		}
-
 		log_trace 'Waiting for lock finished';
 
 		if ( time >= $start_time + 30 ) {
@@ -1728,6 +2264,7 @@ sub dblock () {
 			return 0;
 		}
 	}
+	log_trace 'File-lock done.';
 	return 1;
 }
 

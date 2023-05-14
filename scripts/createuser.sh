@@ -1,10 +1,11 @@
 #!/bin/bash
 #
-# Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
+# Copyright (C) 2022-2023 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
 #
 # This file is part of Meqaris (Meeting Equipment and Room Invitation System),
 #  software that allows booking meeting rooms and other resources using
 #  e-mail invitations.
+# Meqaris homepage: https://meqaris.sourceforge.io/
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU Affero General Public License as published by

@@ -168,6 +168,59 @@ the same as an empty string), run just
 	<pre>	meqaris --set &lt;name&gt;</pre>
 
 <p>
+To use <a href="https://en.wikipedia.org/wiki/CalDAV" hreflang="en">CalDAV</a>
+with Meqaris, you begin by adding CalDAV servers (calendar locations).
+To do that, use the <code>--add-caldav-server</code> parameter
+(and remember to properly quote or escape the parameters):
+</p>
+<pre>	meqaris --add-caldav-server 'http://some-url/some/calendar/location'
+		--name 'Some CalDAV server'</pre>
+
+<p>
+The URL (after the <code>--add-caldav-server</code> parameter) and name are required.
+If the server requires authentication, you can pass the <code>--user</code>,
+<code>--password</code> and <code>--realm</code> (if needed) parameters:
+</p>
+<pre>	meqaris --add-caldav-server 'http://some-url'
+		--name 'Some CalDAV server'
+		--user some-user --password users-password</pre>
+
+<p>
+To later modify the server, if needed, use the <code>--update-caldav-server</code> parameter,
+passing the name of the server to modify and the new values:
+</p>
+<pre>
+	meqaris --update-caldav-server 'CalDAV1'
+		--name 'CalDAV2'
+		--url 'http://caldav2/some/calendar/location'
+		--user caldav2-user
+		--password 'caldav2-password'
+		--realm caldav2</pre>
+
+<p>
+Once CalDAV servers are added, you can assign resources to them so that Meqaris
+knows which servers to notify when an invitation for a particular resource is
+processed.
+</p>
+<p>
+To assign an existing resource to a CalDAV server, use the <code>--add-caldav-resource</code> parameter:
+</p>
+<pre>	meqaris --add-caldav-resource 'Some CalDAV server'
+		--name 'Resource name'</pre>
+<p>
+You can assign multiple CalDAV servers to one resource and multiple resources to one CalDAV server.
+</p>
+<p>
+To un-assign an existing resource from a CalDAV server, use the <code>--delete-caldav-resource</code> parameter:
+</p>
+<pre>	meqaris --delete-caldav-resource 'Some CalDAV server'
+		--name 'Resource name'</pre>
+<p>
+To delete a CalDAV server and un-assign all existing resources from it, use the <code>--delete-caldav-server</code> parameter:
+</p>
+<pre>	meqaris --delete-caldav-server 'Some CalDAV server'</pre>
+
+<p>
 To completely delete the Meqaris data and database structures in the
 database, run
 </p>
@@ -199,7 +252,7 @@ displays Meqaris license information, and
 displays Meqaris version information.
 
 <p>
-You can use the provided <code>scripts/mkdump.sh</code> script to make a database backup
+You can use the provided <code>scripts/mkdump.sh</code> script to make a database backup,
 which can later be restored using the <code>scripts/restoredb.sh</code> script.
 </p>
 
@@ -236,17 +289,17 @@ The <code>datadir</code> parameter in the <code>[meqaris]</code> section tells w
 data files (SQL files) are.
 </p>
 <p>
+The <code>log4perl_config_location</code> parameter in the <code>[meqaris]</code> section gives the
+location of the configuration file for Log::Log4perl.
+</p>
+<p>
 The <code>lock_dir</code> parameter in the <code>[meqaris]</code> section gives the
 location of the directory to put lock files in. Lock files prevent two or more
 Meqaris processes from accessing crucial code at the same time, to avoid e.g.
 running two database upgrades at the same time (one of which is bound to fail).
 <br>
-The directory must be writeable by your mail server's user (and its parent directories
+The directory must be writable by your mail server's user (and its parent directories
 must be traversable by your mail server's user).
-</p>
-<p>
-The <code>log4perl_config_location</code> parameter in the <code>[meqaris]</code> section gives the
-location of the configuration file for Log::Log4perl.
 </p>
 <p>
 The <code>username</code> parameter in the <code>[postgresql]</code> section gives the database
@@ -262,7 +315,9 @@ database to connect to.
 </p>
 <p>
 The <code>host</code> parameter in the <code>[postgresql]</code> section gives the hostname or an
-IP address of the database to connect to.
+IP address of the database to connect to. It can also be the path to the directory containing the local
+PostgreSQL socket for local connections, e.g. <code>/run/postgresql/</code> in some versions,
+<code>/tmp</code> in other.
 </p>
 <p>
 The <code>port</code> parameter in the <code>[postgresql]</code> section gives the port number of
@@ -326,23 +381,91 @@ Currently, the following user-modifiable parameters are supported:
 
  <li><code>mail_command</code>: The command to pipe the outgoing mail replies into
   instead of sending the replies using a mail server. The default value is
-  <code>NULL</code>.<br> To gather replies in a file (on Linux), use something like
+  <code>NULL</code>, which silently drops the responses.<br>
+  <em class="important">The setting is used only when <code>mail_sending_method = "mail_command"</code></em>.<br>
+  To gather replies in a file (on Linux), use something like
 
   	<pre>	cat >> /path/to/your_file</pre>
 
-  and make sure that the file is writeable (and all the directories on the path
+  and make sure that the file is writable (and all the directories on the path
   are traversable) by the mail server's user.<br>
   To send replies to standard output, use just
 
   	<pre>	cat</pre>
 
-  The setting is used only when <code>mail_sending_method = "mail_command"</code>.
-  <br><br></li>
+  Meqaris will substitute the following strings in the command you set in the
+   <code>mail_command</code> parameter:
+  <ul>
+   <li><code>%from%</code> gets substituted by the value of the <code>From</code> header in the response
+    (which is the resource's name and e-mail address),
+   <li><code>%to%</code> gets substituted by the value of the <code>To</code> header in the response
+    (which usually is the meeting Organizer),
+   <li><code>%cc%</code> gets substituted by the value of the <code>Cc</code> header in the response
+    (which usually is the address of the sender of the invitation, which can
+    be different than the Organizer),
+   <li><code>%subject%</code> gets substituted by the subject of the response e-mail,
+   <li><code>%action%</code> gets substituted by the action Meqaris took - <code>Accepted</code>
+    or <code>Declined</code>.
+  </ul>
+  This way, you can pipe your responses to another mailing mechanism, e.g.:
+  <pre>
+	meqaris --set mail_command --value 'some_mail_program --from "%from%" --to "%to%"'
+	meqaris --set mail_sending_method --value mail_command</pre>
+  </li>
 
  <li><code>parser_tmp_dir</code>: The path to a temporary directory for files with
   message parts. Default = <code>/tmp</code>. <code>NULL</code> means use the default.
   <br><br></li>
 
+ <li><code>reply_detail_level</code>: An integer saying how much detailed will the replies be. 0 = the default.
+  <br><br></li>
+</ul>
+
+<hr>
+<h2 class="c">Troubleshooting</h2>
+
+<ul>
+ <li>If you get errors similar to:
+	<pre>	Can't locate X in @INC (you may need to install the X module)</pre>
+	then make sure that all the required Perl modules and their dependencies are
+	installed. If you installed them in non-standard locations, you may need to
+	run Meqaris by using the <code>perl</code> command and pass the required paths in the
+	<code>-I</code> parameter, e.g.
+	<pre>    perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini</pre>
+	</li>
+ <li>If the <code>--status</code> command displays something like:
+	<pre>
+	Configuration file '/path/to/meqaris.ini': OK
+	Data directory: '/path/to/meqaris/data': OK
+	Database connection: ERROR: cannot connect: connection to server at
+	 "127.0.0.1", port 5432 failed: Connection refused
+         Is the server running on that host and accepting TCP/IP connections?</pre>
+
+	then check:
+	<ul>
+	 <li>if the database connection parameters in the INI file are correct,</li>
+	 <li>if the database is actually running.</li>
+	</ul>
+	</li>
+ <li>If you send e-mail invitation to Meqaris, but don't get a response, then:
+	<ul>
+	 <li>check your mail server configuration if the invitations are properly
+	  passed to Meqaris,</li>
+	 <li>check your mail server logs if the invitations were in fact sent to Meqaris</li>
+	 <li>save your e-mail to a text file, send it to Meqaris by hand:
+	  <pre>	meqaris --conf /path/to/meqaris.ini &lt; your_mail.eml</pre>
+	  and examine the output,</li>
+	 <li>check the Meqaris' logs for more information. Increase the logging level
+	  if necessary.</li>
+	</ul>
+	</li>
+ <li>Excluding more than one date in CalDAV doesn't work.<br>
+	Unfortunately, even though Meqaris tries to keep all <code>EXDATE</code>
+	values in one line, at least Cyrus IMAP translates them into
+	multiple, separate entries.<br>
+	Unfortunately, despite the RFC saying that multiple <code>EXDATE</code>
+	entries are allowed, not all clients support this.<br>
+	</li>
 </ul>
 
 </body></html>

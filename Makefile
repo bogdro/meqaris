@@ -1,6 +1,6 @@
 # Meqaris Makefile
 #
-# Copyright (C) 2022 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
+# Copyright (C) 2022-2023 Bogdan 'bogdro' Drozdowski, bogdro (at) users . sourceforge . net
 #
 # This file is part of Meqaris (Meeting Equipment and Room Invitation System),
 #  software that allows booking meeting rooms and other resources using
@@ -40,7 +40,8 @@ PACK1_EXT = .tar
 PACK2 = /usr/bin/gzip -9
 PACK2_EXT = .gz
 
-POD2MAN = pod2man
+POD2MAN = /usr/bin/pod2man
+POD2CHK = /usr/bin/podchecker
 
 SUBDIRS = bin config manual scripts sql
 
@@ -76,6 +77,7 @@ $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT): $(EXTRA_DIST) \
 	$(RMDIR) $(NAME)-$(VER)
 	$(MKDIR) $(NAME)-$(VER)
 	$(COPY) $(EXTRA_DIST) $(SUBDIRS) $(NAME)-$(VER)
+	$(RMDIR) $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT)
 	$(PACK1) $(NAME)-$(VER)$(PACK1_EXT) $(NAME)-$(VER)
 	$(PACK2) $(NAME)-$(VER)$(PACK1_EXT)
 	$(RMDIR) $(NAME)-$(VER)
@@ -96,12 +98,14 @@ install:
 	$(CHMOD) 644 $(DATADIR)/$(NAME)/$(NAME)-log4perl.cfg
 	$(COPY) manual AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt \
 		README $(DOCDIR)/$(NAME)/
+	$(POD2CHK) $(NAME).pod
 	$(POD2MAN) $(NAME).pod $(MANDIR)/man1/$(NAME).1
 	#$(PACK2) $(MANDIR)/man1/$(NAME).1
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/en/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/en/rsrc/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/rsrc/*.*
 	$(CHMOD) 644 $(DOCDIR)/$(NAME)/manual/rsrc/css/*.*
+	$(CHMOD) 755 $(DOCDIR)/$(NAME)
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/en
 	$(CHMOD) 755 $(DOCDIR)/$(NAME)/manual/en/rsrc
@@ -120,4 +124,7 @@ uninstall:
 	$(RMDIR) $(DATADIR)/$(NAME)
 	$(RMDIR) $(MANDIR)/man1/$(NAME).1*
 
-.PHONY: all dist install uninstall
+check:
+	cd test && ./test-suite.sh
+
+.PHONY: all dist install uninstall check

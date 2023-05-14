@@ -24,6 +24,7 @@ Requirements:
   * DBI,
   * Fcntl,
   * Getopt::Long,
+  * HTTP::DAV,
   * Log::Log4perl,
   * MIME::Base64,
   * MIME::Parser,
@@ -32,9 +33,6 @@ Requirements:
   DateTime, DateTime::TimeZone, Moo, Set::Infinite, Test::Requires,
   Class::Accessor-Chained, Class::ReturnValue, DateTime::Event::ICal,
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
-
-  The Log::Log4perl module should be optional, but can be of great help with
-  logging when problems occur.
 
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
 
@@ -54,10 +52,17 @@ Various versions of Meqaris have been successfully used with the following
  components in the following versions:
 
 1. PostgreSQL:
+	- 11.x (checked: 11.18), with an extra installation step
+	- 12.x (checked: 12.13), with an extra installation step
+	- 13.x (checked: 13.9)
 	- 14.x (checked: 14.1)
-2. Perl:
+	- 15.x (checked: 15.1, 15.3)
+2. Perl (https://www.perl.org/):
+	- v5.20.3
 	- v5.34.0
-3. Postfix:
+3. Postfix (https://www.postfix.org/):
 	- 3.6.5
+4. Cyrus IMAP (https://www.cyrusimap.org/) (CalDAV module):
+	- 3.6.0
 
 Other versions may also work.

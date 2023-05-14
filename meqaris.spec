@@ -11,7 +11,7 @@ is a system that allows booking meeting rooms and other resources (like\
 mobile whiteboards, projectors or conference sets) using the same e-mail\
 invitations that are used to invite participants to meetings.
 
-%define _unpackaged_files_terminate_build 0
+#define _unpackaged_files_terminate_build 0
 %define _enable_debug_packages 0
 
 Summary:	%{meq_summary}

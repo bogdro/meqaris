@@ -36,6 +36,7 @@
    <li>DBI,</li>
    <li>Fcntl,</li>
    <li>Getopt::Long,</li>
+   <li>HTTP::DAV,</li>
    <li>Log::Log4perl,</li>
    <li>MIME::Base64,</li>
    <li>MIME::Parser,</li>
@@ -48,10 +49,6 @@
   DateTime::Event::Recurrence, Params::Validate, Text::vFile::asData).
   </p>
   <p>
-  The Log::Log4perl module should be optional, but can be of great help with logging
-  when problems occur.
-  </p>
-  <p>
   Actual mail sending requires the Net::SMTP and Net::Domain Perl modules,
   </p>
  </li>
@@ -60,7 +57,7 @@
 	On a Linux system, you would do one of:
 	<ul>
 	 <li>login to the system as the database user <code>postgres</code> (you can
-		do <code>su - postgres</code> as <code>root</code> to login to that account on Linux) and run:
+		do <code>su - postgres</code> as <code>root</code> to log in to that account on Linux) and run:
 	  <pre>	pg_ctl start</pre>
 	  </li>
 	 <li>login as <code>root</code> and run:
@@ -95,7 +92,17 @@
 	(for the specified user to be the database owner)
 	</li>
 
- <li>Database access rules must be created within the database server unless you wish to leave the default rules.<br>
+ <li><em class="important">NOTE for older database versions</em><br>
+	On PostgreSQL versions older than 13.0, you may need to perform one additional step before
+	running Meqaris - install the <code>btree_gist</code> extension manually in the Meqaris database you've
+	just created. Meqaris cannot do this, because only the database superuser (usually
+	<code>postgres</code>) is allowed to do it.
+	Substitute the hostname and port number where necessary and run this command to install the extension:
+	<pre>
+	psql -U postgres -h hostname -p port_number -d meqaris -c 'create extension if not exists btree_gist;'</pre>
+	</li>
+
+ <li>Database access rules must be created within the database server, unless you wish to leave the default rules.<br>
 	With PostgreSQL, you would do (as the database user <code>postgres</code> or <code>root</code>):
 	<pre>
 	cp /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf-backup
@@ -145,20 +152,21 @@
    	The manual page will be installed in <code>MANDIR/man1</code>.</li>
   </ul></li>
 
- <li>Copy <code>bin/meqaris</code> to <code>BINDIR</code></li>
+ <li>Copy <code>bin/meqaris</code> to <code>BINDIR</code>,</li>
 
- <li>Edit <code>config/meqaris.ini</code> to match your directories and database settings (see below)</li>
+ <li>Edit <code>config/meqaris.ini</code> to match your directories and database settings (see below),</li>
 
- <li>Edit <code>config/meqaris-log4perl.cfg</code> and choose your log file's location</li>
+ <li>Edit <code>config/meqaris-log4perl.cfg</code> and choose your log file's location,</li>
 
- <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR</code>.</li>
+ <li>Copy the whole <code>sql</code> directory and the <code>config/meqaris-log4perl.cfg</code> file to <code>DATADIR/meqaris</code>.
+	The <code>DATADIR/meqaris</code> directory must be writable for your mail server,</li>
 
- <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code></li>
+ <li>Copy <code>config/meqaris.ini</code> to <code>CONFDIR</code>,</li>
 
  <li>Copy <code>config/meqaris.logrotate</code> to a directory expected to contain logrotate
-  configuration files (like <code>CONFDIR/logrotate.d</code>)</li>
+  configuration files (like <code>CONFDIR/logrotate.d</code>),</li>
 
- <li>Copy the manual to a place suitable for documentation, like <code>/usr/share/doc</code></li>
+ <li>Copy the manual to a place suitable for documentation, like <code>/usr/share/doc</code>.</li>
 
 </ol>
 
@@ -178,9 +186,9 @@ All the above directories and their parent directories must be reachable by
 your mail server.
 </p>
 <p>
-The log file (<code>/var/log/meqaris.log</code> by default) must be created writeable for
+The log file (<code>/var/log/meqaris.log</code> by default) must be created writable for
 your mail server. Alternatively, the directory which would contain it must be
-writeable by your mail server.
+writable by your mail server.
 </p>
 <p>
 The necessary database structures will be automatically created by the application itself
@@ -217,7 +225,7 @@ directory in the <code>[meqaris]</code> section under:
 
 <p>
 Make sure that the <code>datadir</code> directory, the <code>log4perl_config_location</code> file
-and the actual log file have the right permission so that Meqaris, which
+and the actual log file have the right permissions so that Meqaris, which
 will run under the mail server's privileges, has the right access to all of
 those locations.
 </p>
@@ -234,7 +242,7 @@ replies.
 </p>
 <p>
 For Postfix, you can edit the <code>/etc/postfix/aliases</code> file and add the right
-command there. It must being with the "pipe" symbol - "|" - so that the
+command there. It must begin with the "pipe" symbol - "|" - so that the
 Meqaris script receives the mail on the so-called "standard input".
 </p>
 <p>
@@ -249,6 +257,39 @@ default paths, the most complicated entry in the <code>/etc/postfix/aliases</cod
 </p>
 <pre>
 	room1: |"SMTPHOSTS=smtp-host-name /path/to/perl -I /path/to/perl/modules /path/to/meqaris --conf /path/to/meqaris.ini"</pre>
+<p>
+By using just the <code>cat</code> command as the output instead of sending e-mails
+(see the <a href="usage-admin.html" hreflang="en">Manual for administrators</a>),
+you can pipe the reply from Meqaris to other commands, including the mail
+server's own commands and since you know e.g. the alias which is being
+processed, you can add it to the other command's options, like so:
+</p>
+<pre>
+	room1: |"meqaris"| some-other-command "room1"</pre>
+
+<p>
+Meqaris will substitute the following strings in the command you set in the
+ <code>mail_command</code> parameter:
+</p>
+<ul>
+ <li><code>%from%</code> gets substituted by the value of the <code>From</code> header in the response
+  (which is the resource's name and e-mail address),
+ <li><code>%to%</code> gets substituted by the value of the <code>To</code> header in the response
+  (which usually is the meeting Organizer),
+ <li><code>%cc%</code> gets substituted by the value of the <code>Cc</code> header in the response
+  (which usually is the address of the sender of the invitation, which can
+  be different than the Organizer),
+ <li><code>%subject%</code> gets substituted by the subject of the response e-mail,
+ <li><code>%action%</code> gets substituted by the action Meqaris took - <code>Accepted</code>
+  or <code>Declined</code>.
+</ul>
+<p>
+This way, you can pipe your responses to another mailing mechanism, e.g.:
+</p>
+<pre>
+	meqaris --set mail_command --value 'some_mail_program --from "%from%" --to "%to%"'
+	meqaris --set mail_sending_method --value mail_command</pre>
+
 <p>
 For a password-less, local-only mail submission, add this to your
 <code>/etc/postfix/main.cf</code> file:
@@ -269,6 +310,91 @@ Restart the Postfix server (or reload its configuration) afterwards.
 <!-- ############################################################ -->
 
 <hr>
+<h2 class="c">CalDAV configuration</h2>
+
+<p>
+Consult your CalDAV server manual about how to create users and their calendars.
+</p>
+<p>
+For <a href="https://www.cyrusimap.org/" hreflang="en">Cyrus IMAP</a>,
+you add users and passwords to the authentication mechanism and then
+create mailboxes in Cyrus IMAP.
+</p>
+<p>
+Start with reading the <a href="https://www.cyrusimap.org/imap/installing.html"
+hreflang="en">Cyrus IMAP installation procedure</a>.
+</p>
+<p>
+After Cyrus IMAP installation, begin by starting the authentication
+mechanism (as <code>root</code>):
+</p>
+<pre>	systemctl start saslauthd</pre>
+<p>or</p>
+<pre>	saslauthd -a sasldb start</pre>
+
+<p>
+Assuming you want a "room1" alias and everything is installed in the default
+paths, you add the user and password (as <code>root</code>):
+</p>
+<pre>	echo 'room1s-password' | saslpasswd2 -p -c room1</pre>
+
+<p>
+Next, make sure the <code>httpmodules</code> line in your <code>imapd.conf</code>
+file contains <code>caldav</code>, like this:
+</p>
+<pre>	httpmodules: caldav carddav</pre>
+<p>
+Check that the <code>SERVICES</code> section in your <code>cyrus.conf</code>
+file contains at least an enabled <code>http</code> service (it can also contain <code>https</code>):
+</p>
+<pre>
+	SERVICES {
+		...
+		http          cmd="httpd" listen="http" prefork=0</pre>
+<p>
+Non-standard paths require passing the location of the <code>imapd.conf</code> file:
+</p>
+<pre>
+	SERVICES {
+		...
+		http          cmd="httpd -C /path/to/imapd.conf" listen="http" prefork=0</pre>
+<p>
+Start Cyrus IMAP by starting the appropriate service or by running just (as <code>root</code>):
+</p>
+<pre>	master</pre>
+(if you installed locally)
+<p>
+You may need to pass paths to the configuration files:
+</p>
+<pre>	/path/to/master -C /path/to/imapd.conf -M /path/to/cyrus.conf -d</pre>
+<p>
+To create a user mailbox for the user "room1" in Cyrus IMAP,
+assuming default paths and that the Cyrus IMAP administration user is called <code>cyrus</code> (with
+the password "cyrus"), run (as <code>root</code>):
+</p>
+<pre>	echo 'createmailbox user/room1@localhost' | cyradm -u cyrus -w cyrus localhost</pre>
+<p>
+The address of the user's calendar is <code>http://localhost/dav/principals/user/room1@localhost/</code>,
+which gets translated into <code>http://localhost/dav/calendars/user/room1/Default/</code>.<br>
+Unless configured otherwise, the calendar requires authentication - you can use the
+username and password passed to the <code>saslpasswd2</code> command earlier,
+or use some other IMAP user.<br>
+After first access to the URL, the calendar should be created.<br>
+<em class="important">This is the URL you will be passing to Meqaris when creating a CalDAV server</em>.
+</p>
+<p>
+You can use your browser to create, manage and download the user's calendar by
+visiting <code>http://localhost/dav/calendars/user/room1/</code> and authenticating as the user.
+</p>
+<p>
+More information can be found on the <a
+href="https://www.cyrusimap.org/imap/download/installation/http/caldav.html"
+hreflang="en">Cyrus IMAP CalDAV page</a>.
+</p>
+
+<!-- ############################################################ -->
+
+<hr>
 <h2 class="c">Uninstallation</h2>
 
 <p>To uninstall, if needed:</p>
@@ -278,7 +404,7 @@ Restart the Postfix server (or reload its configuration) afterwards.
 
  <li>remove the <code>meqaris.ini</code> file from the directory you installed it to</li>
 
- <li>remove the meqaris logrotate configurationfile from the directory you installed it to</li>
+ <li>remove the meqaris logrotate configuration file from the directory you installed it to</li>
 
  <li>remove the <code>meqaris-log4perl.cfg</code> file from the directory you installed it to</li>
 
@@ -297,8 +423,8 @@ Restart the Postfix server (or reload its configuration) afterwards.
 </ul>
 
 <p>
-Alternatively, if you have the 'make' program and some common Linux
- utilities, you can run 'make uninstall', passing the the same directories
+Alternatively, if you have the <code>make</code> program and some common Linux
+ utilities, you can run <code>make uninstall</code>, passing the same directories
  that were used during installation.
  Examples:
 </p>
