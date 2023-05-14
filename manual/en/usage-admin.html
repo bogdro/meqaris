@@ -337,24 +337,9 @@ specifies the database connection timeout, in seconds.
 Meqaris uses also a database table to hold some of its configuration.
 </p>
 <p>
-To modify a setting in the Meqaris database, run
+To modify a setting in the Meqaris database, use the <code>--set</code>
+command, along with <code>--value</code> (if needed), as described above.
 </p>
-
-	<pre>	meqaris --set &lt;name&gt; --value &lt;new_value&gt;</pre>
-
-<p>
-e.g.
-</p>
-
-	<pre>	meqaris --set mail_server --value 127.0.0.1</pre>
-
-<p>
-To set the value to <code>NULL</code> (which is <em class="important">NOT</em>
-the same as an empty string), run just
-</p>
-
-	<pre>	meqaris --set &lt;name&gt;</pre>
-
 <p>
 Currently, the following user-modifiable parameters are supported:
 </p>
@@ -400,7 +385,7 @@ Currently, the following user-modifiable parameters are supported:
     (which is the resource's name and e-mail address),
    <li><code>%to%</code> gets substituted by the value of the <code>To</code> header in the response
     (which usually is the meeting Organizer),
-   <li><code>%cc%</code> gets substituted by the value of the <code>Cc</code> header in the response
+   <li><code>%cc%</code> gets substituted by the value of the <code>CC</code> header in the response
     (which usually is the address of the sender of the invitation, which can
     be different than the Organizer),
    <li><code>%subject%</code> gets substituted by the subject of the response e-mail,
