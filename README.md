@@ -47,7 +47,7 @@ Various versions of Meqaris were successfully used with the following components
   - 12.x (checked: 12.13), with an extra installation step
   - 13.x (checked: 13.9)
   - 14.x (checked: 14.1)
-  - 15.x (checked: 15.1)
+  - 15.x (checked: 15.1, 15.3)
 
  2. Perl:
   - v5.20.3
