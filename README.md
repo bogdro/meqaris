@@ -6,26 +6,26 @@ Meqaris (Meeting Equipment and Room Invitation System) is a system that allows b
 
 Meqaris allows to:
 
-  - register meeting resources,
-  - send invitations to the resources (requires mail server support),
-  - receive positive and negative replies.
+-   register meeting resources,
+-   send invitations to the resources (requires mail server support),
+-   receive positive and negative replies.
 
 Features:
 
-  - supports RFC 2445/5545 iCalendar attachments in mails, both with the text/calendar and application/ics MIME types,
-  - sends mail replies back to the sender,
-  - can pipe the response mail to a specified command,
-  - supports creation, updates and cancellation of single events,
-  - supports creation, updates and cancellation of recurring events,
-  - supports both interval-defined and duration-defined events,
-  - supports CalDAV (RFC 4791),
-  - supports booking multiple resources in a single invitation,
-  - automatically updates its own database structures to the required version when needed,
-  - supports time zones,
-  - mail replies and logs can have various verbosity levels,
-  - has wide logging capabilities,
-  - has a command-line interface - no need to run SQL statements,
-  - portable and system-independent.
+-   supports RFC 2445/5545 iCalendar attachments in mails, both with the text/calendar and application/ics MIME types,
+-   sends mail replies back to the sender,
+-   can pipe the response mail to a specified command,
+-   supports creation, updates and cancellation of single events,
+-   supports creation, updates and cancellation of recurring events,
+-   supports both interval-defined and duration-defined events,
+-   supports CalDAV (RFC 4791),
+-   supports booking multiple resources in a single invitation,
+-   automatically updates its own database structures to the required version when needed,
+-   supports time zones,
+-   mail replies and logs can have various verbosity levels,
+-   has wide logging capabilities,
+-   has a command-line interface - no need to run SQL statements,
+-   portable and system-independent.
 
 Meqaris homepage: <https://meqaris.sourceforge.io/>
 
@@ -33,8 +33,8 @@ Meqaris homepage: <https://meqaris.sourceforge.io/>
 
 ## Requirements ##
 
- 1. Perl (<https://www.perl.org/>), along with some modules (see the documentation inside the package),
- 2. a PostgreSQL database server (<https://www.postgresql.org/>), version 9.2 or newer, with the `btree_gist` extension binary file.
+1.  Perl (<https://www.perl.org/>), along with some modules (see the documentation inside the package),
+2.  a PostgreSQL database server (<https://www.postgresql.org/>), version 9.2 or newer, with the `btree_gist` extension binary file.
 
 ----------------------------------------------------------------
 
@@ -42,22 +42,22 @@ Meqaris homepage: <https://meqaris.sourceforge.io/>
 
 Various versions of Meqaris were successfully used with the following components in the following versions:
 
- 1. PostgreSQL:
-  - 11.x (checked: 11.18), with an extra installation step
-  - 12.x (checked: 12.13), with an extra installation step
-  - 13.x (checked: 13.9)
-  - 14.x (checked: 14.1)
-  - 15.x (checked: 15.1, 15.3)
+1.  PostgreSQL:
+-   11.x (checked: 11.18), with an extra installation step
+-   12.x (checked: 12.13), with an extra installation step
+-   13.x (checked: 13.9)
+-   14.x (checked: 14.1)
+-   15.x (checked: 15.1, 15.3)
 
- 2. Perl:
-  - v5.20.3
-  - v5.34.0
+2.  Perl:
+-   v5.20.3
+-   v5.34.0
 
- 3. Postfix (<https://www.postfix.org/>):
-  - 3.6.5
+3.  Postfix (<https://www.postfix.org/>):
+-   3.6.5
 
- 4. Cyrus IMAP (<https://www.cyrusimap.org/>) (CalDAV module):
-  - 3.6.0
+4.  Cyrus IMAP (<https://www.cyrusimap.org/>) (CalDAV module):
+-   3.6.0
 
 Other versions may also work.
 

@@ -160,7 +160,6 @@ td		{
 
 td hr		{	display: none;			}
 
-
 /* =============================================================== */
 /* CSS 2 */
 @media print {
@@ -208,11 +207,11 @@ td hr		{	display: none;			}
 			color: black;
 			background-color: white;
 		}
-
 }
 
 @media aural {
 
+/* Assign some defaults: */
   body		{
   			pitch-range: 50;
   			volume: soft;
