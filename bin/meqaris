@@ -37,7 +37,7 @@ use MIME::Base64 qw(encode_base64);	# core
 use MIME::Parser;
 use Term::ANSIColor qw(:constants);	# core (5.6.0)
 
-my $meqaris_version = '1.4';
+my $meqaris_version = '2.0';
 my $meqaris_dbversion = 7;
 
 sub send_mail ($$$$@);

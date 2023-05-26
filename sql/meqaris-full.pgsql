@@ -98,7 +98,6 @@ create table meqaris.meq_resource_reservations
 	rr_r_id int constraint rr_fk not null references meqaris.meq_resources (r_id),
 	rr_interval tstzrange not null,
 	rr_e_id int constraint rr_e_fk not null references meqaris.meq_events (e_id) on delete cascade,
-	constraint rr_interval_in_future check (lower(rr_interval) > now() and upper(rr_interval) > now()),
 	-- this is the constraint/index that does all the work:
 	constraint rr_interval_excl exclude using gist (rr_r_id with =, rr_interval with &&)
 );
@@ -114,6 +113,33 @@ comment on index meq_resource_reservations_resource_fk is 'The index for the res
 
 create index meq_resource_reservations_events_fk on meq_resource_reservations (rr_e_id);
 comment on index meq_resource_reservations_events_fk is 'The index for the reservation''s event foreign key';
+
+/* A trigger is better than a constraint for data migration or updating
+   new columns after adding them (a constraint would prevent an update,
+   even of another column). */
+create or replace function meqaris.trg_force_interval_in_future()
+returns trigger as
+$trg_force_interval_in_future$
+begin
+	raise 'Inserting events in the past not allowed'
+		using hint = 'Make sure both ends of the rr_interval column are in the future (constraint rr_interval_in_future)',
+		errcode = 'prohibited_sql_statement_attempted';
+	return null;
+end;
+$trg_force_interval_in_future$ language plpgsql;
+
+comment on function meqaris.trg_force_interval_in_future() is
+'Function for the trigger that prevents inserting new events in the past.';
+
+create trigger trg_rr_interval_in_future
+before insert or update of rr_interval
+on meqaris.meq_resource_reservations
+for each row
+when (lower(new.rr_interval) < now() or upper(new.rr_interval) < now())
+execute procedure meqaris.trg_force_interval_in_future();
+
+comment on trigger trg_rr_interval_in_future on meqaris.meq_resource_reservations is
+ 'Trigger that prevents inserting new events in the past.';
 
 ------------------ CALDAV SERVERS ------------------
 

@@ -12,8 +12,8 @@ Meqaris allows to:
 
 Features:
 
--   supports RFC 2445/5545 iCalendar attachments in mails, both with the text/calendar and application/ics MIME types,
--   sends mail replies back to the sender,
+-   supports RFC 2445/5545 iCalendar attachments in mails (RFC 2446/5546 and 2447/6047), both with the text/calendar and application/ics MIME types,
+-   sends mail replies back to the sender (RFC 2446/5546 and 2447/6047),
 -   can pipe the response mail to a specified command,
 -   supports creation, updates and cancellation of single events,
 -   supports creation, updates and cancellation of recurring events,
@@ -34,7 +34,7 @@ Meqaris homepage: <https://meqaris.sourceforge.io/>
 ## Requirements ##
 
 1.  Perl (<https://www.perl.org/>), along with some modules (see the documentation inside the package),
-2.  a PostgreSQL database server (<https://www.postgresql.org/>), version 9.2 or newer, with the `btree_gist` extension binary file.
+2.  a PostgreSQL database server (<https://www.postgresql.org/>), version 9.2 or newer, with the `btree_gist` extension.
 
 ----------------------------------------------------------------
 

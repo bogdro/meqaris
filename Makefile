@@ -22,7 +22,7 @@
 #
 
 NAME = meqaris
-VER = 1.4
+VER = 2.0
 
 RMDIR = /bin/rm -fr
 # when using '-p', no error is generated when the directory exists
@@ -43,7 +43,7 @@ PACK2_EXT = .gz
 POD2MAN = /usr/bin/pod2man
 POD2CHK = /usr/bin/podchecker
 
-SUBDIRS = bin config manual scripts sql
+SUBDIRS = bin config docker manual scripts sql test
 
 EXTRA_DIST = AUTHORS ChangeLog COPYING INSTALL-Meqaris.txt NEWS \
 	Makefile $(NAME).pod $(NAME).spec README

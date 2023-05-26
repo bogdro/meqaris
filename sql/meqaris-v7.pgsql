@@ -62,6 +62,10 @@ from meqaris.meq_resource_reservations;
 alter table meqaris.meq_resource_reservations
 add column rr_e_id int;
 
+/* must be dropped before update, even if updating another column... */
+alter table meqaris.meq_resource_reservations
+drop constraint rr_interval_in_future;
+
 update meqaris.meq_resource_reservations set rr_e_id = (
 select e_id from meqaris.meq_events where e_uid = rr_uid);
 
@@ -94,6 +98,36 @@ drop column rr_data;
 
 alter index meq_resource_reservations_fk
 rename to meq_resource_reservations_resource_fk;
+
+/* cannot be restored after update, because old rows don't satisfy this */
+/*
+alter table meqaris.meq_resource_reservations
+add constraint rr_interval_in_future check (lower(rr_interval) > now() and upper(rr_interval) > now());
+*/
+
+create or replace function meqaris.trg_force_interval_in_future()
+returns trigger as
+$trg_force_interval_in_future$
+begin
+	raise 'Inserting events in the past not allowed'
+		using hint = 'Make sure both ends of the rr_interval column are in the future (constraint rr_interval_in_future)',
+		errcode = 'prohibited_sql_statement_attempted';
+	return null;
+end;
+$trg_force_interval_in_future$ language plpgsql;
+
+comment on function meqaris.trg_force_interval_in_future() is
+'Function for the trigger that prevents inserting new events in the past.';
+
+create trigger trg_rr_interval_in_future
+before insert or update of rr_interval
+on meqaris.meq_resource_reservations
+for each row
+when (lower(new.rr_interval) < now() or upper(new.rr_interval) < now())
+execute procedure meqaris.trg_force_interval_in_future();
+
+comment on trigger trg_rr_interval_in_future on meqaris.meq_resource_reservations is
+ 'Trigger that prevents inserting new events in the past.';
 
 create table meqaris.meq_caldav_servers
 (
