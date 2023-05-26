@@ -1,10 +1,102 @@
-2022-05-31	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+2023-05-15	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
-	* Meqaris version 1.5:
-
-	* manual/en/{install,usage-admin}.html: Small fixes.
-
-
+	* Meqaris version 2.0:
+	  Added support for CalDAV servers - Meqaris now sends the accepted
+	  events to and deletes the cancelled events from CalDAV servers
+	  connected to the impacted resources. Added support for parameters
+	  in the 'mail_command' setting. Database re-designed for better
+	  support for recurring events. Database checks added for validating
+	  the resources' e-mail addresses. Send responses to the meeting
+	  Organizer, CC'ing the e-mail sender, who may be just forwarding.
+	  Fixed checking if the command specified in 'mail_command' actually
+	  ran. Added creating the btree_gist extension in the documentation
+	  and scripts. Added automatic tests. Added Docker configuration
+	  files. Support multiple RDATE and EXDATE values. Support deleting
+	  (cancelling) events just for some attendees. Cancel all occurrences
+	  of an event if STATUS=CANCELLED. Fixes when updating events.
+	  Clean-up code is in one place now. Many fixes in command-line
+	  processing. Exit early if input or configuration seem malformed.
+	  Fixes in database upgrade code. Updates in the default configuration.
+	  Many other code changes and refactoring. Updated copyright. Updates
+	  in packaging. Fixes and updates in the documentation. Other small
+	  changes.
+	* bin/meqaris (main): Support multiple RDATE and EXDATE values. Support
+	  deleting (cancelling) events just for some attendees if specified.
+	  Support cancelling all occurrences of an event if STATUS=CANCELLED.
+	  Put clean-up code in an END{} block. Make command-line messages
+	  defined just once and fix some of them. Move some common code to new
+	  subroutines. Delete all old event instances when processing an
+	  updating invitation. Support events in a separate table in inserting
+	  and deleting. Fixed the order of processing command-line options.
+	  Fixed checking parameter values for command-line options. Exit with
+	  a fatal error if 'From' or 'Subject' is missing to avoid undefined
+	  values later. Other small changes.
+	* bin/meqaris (db_connect): Exit early and log an error if "dbtype"
+	  is not defined (missing in configuration).
+	* bin/meqaris (db_upgrade): Commit only on no error.
+	* bin/meqaris (db_run_file): Properly handle errors when opening an
+	  SQL file fails. More efficient execution of the SQL file (see:
+	  'perldoc perlport'). Make messages defined just once.
+	* bin/meqaris (clean_name): Substitute special characters in
+	  resource names when creating or updating.
+	* bin/meqaris (db_connect_print, db_stmt_print, db_upgrade_print):
+	  Commands typed on the command line also display errors now.
+	* bin/meqaris (send_mail): Stop sending version in response e-mails.
+	  Send responses to the meeting Organizer, CC'ing the e-mail sender,
+	  who may be just forwarding. Added support for parameters in the
+	  mail_command setting. Fixed checking if the command specified in
+	  'mail_command' actually ran.
+	* bin/meqaris (get_sender_mail): A separate subroutine to get the
+	  sender's e-mail address.
+	* bin/meqaris (process_insert_error): A new subroutine to decline
+	  invitations on database errors.
+	* bin/meqaris (insert_event): A new subroutine for common statements
+	  that insert events.
+	* bin/meqaris (val_limit): A new subroutine for calling substr() with
+	  common limits.
+	* bin/meqaris (send_accept): A new subroutine for sending 'Accepted'
+	  replies.
+	* bin/meqaris (send_decline): A new subroutine for sending 'Declined'
+	  replies.
+	* bin/meqaris (main, send_accept, notify_caldav): Support for CalDAV.
+	* bin/meqaris (check_cmd_error): A new subroutine for checking for and
+	  handling database errors in command-line options.
+	* bin/meqaris (dblock): Fixed file-based locking.
+	* sql/meqaris-full.pgsql: Disallow special characters in e-mail
+	  addresses of resources. Moved events to a separate table and added
+	  the required constraints and indices. Support for CalDAV. Replace
+	  the rr_interval_in_future constraint by a trigger to support updates
+	  during e.g. migration.
+	* sql/meqaris-v7.pgsql: New database file for the changes.
+	* scripts/createdatabase.sh: Added creating the btree_gist extension.
+	* config/meqaris-log4perl.cfg: Add UID logging.
+	* Makefile: Fix permissions on the documentation directory. Remove the
+	  old package before packaging a new one. Added checking POD syntax.
+	  Use full paths for POD tools.
+	* meqaris.spec: Disallow installed but unpackaged files.
+	* test/: Added tests.
+	* docker/: Added sample configuration files and scripts to build a
+	  Docker image of a Meqaris database.
+	* INSTALL-Meqaris.txt, manual/en/install.html: Added an additional
+	  installation step for PostgreSQL versions earlier than 13.0. Wrote
+	  about using the "cat" command to pipe mails to other programs.
+	* INSTALL-Meqaris.txt, manual/en/{install,usage-admin,usage-user}.html:
+	  Small fixes.
+	* INSTALL-Meqaris.txt, manual/en/{install,usage-admin}.html: Added
+	  information about parameters in the mail_command setting. Other
+	  small fixes.
+	* INSTALL-Meqaris.txt: Removed duplicated project home page. Deleted
+	  installing the PL/pgSQL language (it's built-in since PostgreSQL
+	  9.0 and Meqaris requires 9.2+ anyway).
+	* manual/en/usage-admin.html: Added a note about local connections to
+	  the database (using a directory containing the socket). Added the
+	  troubleshooting section from the old text user manual. Added missing
+	  information about the 'reply_detail_level' database parameter.
+	* README, README.md, manual/en/readme.html: Updated compatibility.
+	* INSTALL-Meqaris.txt, README, manual/en/{index,install,readme,
+	  usage-admin}.html, meqaris.pod: Added information about CalDAV.
+	* manual/en/usage-user.html: Clarification about what Meqaris is.
+	* meqaris.pod: Clarified some of the commands, other small fixes.
 
 2022-05-29	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
