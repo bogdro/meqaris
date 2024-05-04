@@ -29,14 +29,10 @@ Features:
 
 Meqaris homepage: <https://meqaris.sourceforge.io/>
 
-----------------------------------------------------------------
-
 ## Requirements ##
 
 1.  Perl (<https://www.perl.org/>), along with some modules (see the documentation inside the package),
 2.  a PostgreSQL database server (<https://www.postgresql.org/>), version 9.2 or newer, with the `btree_gist` extension.
-
-----------------------------------------------------------------
 
 ## Compatibility ##
 
@@ -48,6 +44,7 @@ Various versions of Meqaris were successfully used with the following components
 -   13.x (checked: 13.9)
 -   14.x (checked: 14.1)
 -   15.x (checked: 15.1, 15.3)
+-   16.x (checked: 16.0)
 
 2.  Perl:
 -   v5.20.3
@@ -61,13 +58,9 @@ Various versions of Meqaris were successfully used with the following components
 
 Other versions may also work.
 
-----------------------------------------------------------------
-
 ## ChangeLog ##
 
 For a summary of changes, refer to the `ChangeLog` file in the package.
-
-----------------------------------------------------------------
 
 ## WARNING ##
 
