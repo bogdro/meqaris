@@ -1231,31 +1231,20 @@ for my $p (@parts) {
 							next unless $period;
 							log_trace 'Recurring event - RDATE period - inserting intervals.';
 
-							$stmth = db_stmt ($dbh,
-								'insert into meqaris.meq_resource_reservations ' .
-								'(rr_r_id, rr_interval, rr_e_id) ' .
-								'values ($1, $2, $3)');
-							@values_insert = (
-								$res->{$reply_sender}->{'r_id'},
-								'[' . $period->start . ',' . $period->end . ')',
-								$e_id);
-							if ( $stmth ) {
-
-								$stmth->execute(@values_insert);
-								if ( $dbh->errstr ) {
-
-									$processed = process_insert_error ($event, $attendee,
-										$organizer_mail, $updating, $reply_sender);
-									$was_err = 1;
-									last;
-								}
-							}
-							else {
-								$processed = process_insert_error ($event, $attendee,
-									$organizer_mail, $updating, $reply_sender);
-								$was_err = 1;
-								last;
-							}
+							my $next = 0;
+							my $last = 0;
+							my %params = (
+								dt_start_conv => $period->start,
+								dt_end_conv => $period->end,
+								duration => $duration, # MUST pass as-is for the 'defined' test
+								e_id => $e_id,
+								event => $event,
+								attendee => $attendee,
+								organizer_mail => $organizer_mail,
+								updating => $updating
+							);
+							($processed, $was_err, $next, $last) = insert_event (%params);
+							last if $last;
 						}
 						if ( ! $was_err ) {
 							my $iter = $dates->iterator;
