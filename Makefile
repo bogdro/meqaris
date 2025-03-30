@@ -77,6 +77,9 @@ $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT): $(EXTRA_DIST) \
 	$(RMDIR) $(NAME)-$(VER)
 	$(MKDIR) $(NAME)-$(VER)
 	$(COPY) $(EXTRA_DIST) $(SUBDIRS) $(NAME)-$(VER)
+	$(RMDIR) $(NAME)-$(VER)/test/meqaris-log4perl-test.cfg
+	$(RMDIR) $(NAME)-$(VER)/test/meqaris-test.ini
+	$(RMDIR) $(NAME)-$(VER)/test/*.log
 	$(RMDIR) $(NAME)-$(VER)$(PACK1_EXT)$(PACK2_EXT)
 	$(PACK1) $(NAME)-$(VER)$(PACK1_EXT) $(NAME)-$(VER)
 	$(PACK2) $(NAME)-$(VER)$(PACK1_EXT)
