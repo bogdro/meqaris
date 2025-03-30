@@ -25,7 +25,7 @@
 # https://docs.docker.com/engine/reference/builder/
 
 # https://hub.docker.com/_/postgres
-FROM postgres:latest
+FROM postgres:17
 
 ######################################################################
 # NOTE: for professional use, you MUST add a permanent storage
