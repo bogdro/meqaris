@@ -25,7 +25,7 @@
 
 . test-func.bash
 
-$meqaris --destroy-db
+$meqaris --destroy-db || true
 $meqaris --upgrade-db
 $meqaris --create 'Room 403' --email room403@localhost
 $meqaris --create 'Room 404' --email room404@localhost
