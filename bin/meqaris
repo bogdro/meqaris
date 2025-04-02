@@ -521,7 +521,7 @@ if ( $set ) {
 	if ( $set eq 'db_version' ) {
 
 		log_debug 'Attempting to modify a forbidden parameter';
-		exit 1;
+		check_cmd_error (undef, 0, 'modify setting', 'not found');
 	}
 	my $dbh = db_connect_print();
 	db_upgrade_print ($dbh);
@@ -697,7 +697,7 @@ sub check_cmd_error($$$$) {
 	my $action = shift;
 	my $reason = shift;
 
-	if ( $dbh->errstr ) {
+	if ( defined($dbh) && $dbh->errstr ) {
 		my $msg = "Database: cannot $action: " . $dbh->errstr;
 		log_error $msg;
 		print $msg . "\n";
