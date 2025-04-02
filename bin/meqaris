@@ -1208,6 +1208,13 @@ for my $p (@parts) {
 					$stmth = undef;
 					my @values_insert = undef;
 					my $was_err = 0;
+					my %params = (
+						duration => $duration, # MUST pass as-is for the 'defined' test
+						e_id => $e_id,
+						event => $event,
+						attendee => $attendee,
+						organizer_mail => $organizer_mail
+					);
 					if ( defined ($rdates) || defined ($rrules) ) {
 
 						log_trace 'RDATE or RRULE defined - building recurring events.';
@@ -1233,16 +1240,9 @@ for my $p (@parts) {
 
 							my $next = 0;
 							my $last = 0;
-							my %params = (
-								dt_start_conv => $period->start,
-								dt_end_conv => $period->end,
-								duration => $duration, # MUST pass as-is for the 'defined' test
-								e_id => $e_id,
-								event => $event,
-								attendee => $attendee,
-								organizer_mail => $organizer_mail,
-								updating => $updating
-							);
+							$params{dt_start_conv} = $period->start;
+							$params{dt_end_conv} = $period->end;
+							$params{updating} = $updating;
 							($processed, $was_err, $next, $last) = insert_event (%params);
 							last if $last;
 						}
@@ -1250,16 +1250,9 @@ for my $p (@parts) {
 							my $iter = $dates->iterator;
 							my $next = 0;
 							my $last = 0;
-							my %params = (
-								dt_start_conv => $dt_start_conv,
-								dt_end_conv => $dt_end_conv,
-								duration => $duration, # MUST pass as-is for the 'defined' test
-								e_id => $e_id,
-								event => $event,
-								attendee => $attendee,
-								organizer_mail => $organizer_mail,
-								updating => $updating
-							);
+							$params{dt_start_conv} = $dt_start_conv;
+							$params{dt_end_conv} = $dt_end_conv;
+							$params{updating} = $updating;
 							while ( my $dt = $iter->next ) {
 
 								$params{start_string} = $dt->stringify;
@@ -1279,16 +1272,9 @@ for my $p (@parts) {
 					}
 					else {
 						my $next = 0;
-						my %params = (
-							dt_start_conv => $dt_start_conv,
-							dt_end_conv => $dt_end_conv,
-							duration => $duration, # MUST pass as-is for the 'defined' test
-							e_id => $e_id,
-							event => $event,
-							attendee => $attendee,
-							organizer_mail => $organizer_mail,
-							updating => $updating
-						);
+						$params{dt_start_conv} = $dt_start_conv;
+						$params{dt_end_conv} = $dt_end_conv;
+						$params{updating} = $updating;
 						($processed, $was_err, $next, undef) = insert_event (%params);
 						next AT if $next;
 					}
