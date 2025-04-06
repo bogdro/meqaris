@@ -25,7 +25,7 @@ set -e
 set -x
 
 cwd=`pwd`
-meqaris='../bin/meqaris --conf meqaris-test.ini'
+meqaris='perl -Mwarnings=FATAL ../bin/meqaris --conf meqaris-test.ini'
 
 organizer_mail='someone@localhost'
 from="someone <someone@localhost>"
