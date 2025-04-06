@@ -1556,11 +1556,7 @@ sub print_help {
 
 sub send_mail ($$$$@) {
 
-	my $event = shift;
-	my $from = shift;
-	my $organizer_mail = shift;
-	my $response_type = shift;
-	my $response_details = shift;
+	my ($event, $from, $organizer_mail, $response_type, $response_details) = @_;
 
 	log_debug "Preparing response '$response_type: $subject' from '$from' to '$organizer_mail' and Cc '$sender'";
 
@@ -1657,13 +1653,8 @@ sub send_mail ($$$$@) {
 
 sub send_accept ($$$$$$$) {
 
-	my $event = shift;
-	my $attendee = shift;
-	my $organizer_mail = shift;
-	my $updating = shift;
-	my $reply_sender = shift;
-	my $response_details = shift;
-	my $uid = shift;
+	my ($event, $attendee, $organizer_mail, $updating,
+		$reply_sender, $response_details, $uid) = @_;
 
 	$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
 	$dbh->commit if $updating;
@@ -1681,12 +1672,8 @@ sub send_accept ($$$$$$$) {
 
 sub send_decline ($$$$$$) {
 
-	my $event = shift;
-	my $attendee = shift;
-	my $organizer_mail = shift;
-	my $updating = shift;
-	my $reply_sender = shift;
-	my $response_details = shift;
+	my ($event, $attendee, $organizer_mail, $updating,
+		$reply_sender, $response_details) = @_;
 
 	$dbh->rollback if $updating;
 	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
@@ -1701,12 +1688,7 @@ sub send_decline ($$$$$$) {
 
 sub process_insert_error($$$$$) {
 
-	my $event = shift;
-	my $attendee = shift;
-	my $organizer_mail = shift;
-	my $updating = shift;
-	my $reply_sender = shift;
-
+	my ($event, $attendee, $organizer_mail, $updating, $reply_sender) = @_;
 	my @response_details = ();
 
 	log_error "Error inserting new event:\n" . $dbh->errstr . "\n- declining.";
@@ -1826,11 +1808,7 @@ sub insert_event (\%) {
 
 sub notify_caldav ($$$$$) {
 
-	my $type = shift;
-	my $event = shift;
-	my $reply_sender = shift;
-	my $uid = shift;
-	my $caldav_servers = shift;
+	my ($type, $event, $reply_sender, $uid, $caldav_servers) = @_;
 
 	my @response_details = ();
 	my $result = 0;
@@ -1999,8 +1977,7 @@ sub clean_name ($) {
 
 sub prop_array ($$) {
 
-	my $event = shift;
-	my $prop = shift;
+	my ($event, $prop) = @_;
 	# Check the property. ARRAY! List context required!
 	return (defined ($event->property($prop))? @{$event->property($prop)} : undef);
 }
@@ -2067,8 +2044,8 @@ sub db_connect_print {
 
 sub db_stmt ($$) {
 
-	my $dbh = shift;
-	my $sql = shift;
+	my ($dbh, $sql) = @_;
+
 	my $stmth = $dbh->prepare ($sql);
 	if ( ! $stmth ) {
 		log_fatal 'Database: cannot create statement: ' . $dbh->errstr;
@@ -2078,8 +2055,8 @@ sub db_stmt ($$) {
 
 sub db_stmt_print ($$) {
 
-	my $dbh = shift;
-	my $sql = shift;
+	my ($dbh, $sql) = @_;
+
 	my $stmth = db_stmt($dbh, $sql);
 	if ( ! $stmth ) {
 
@@ -2110,8 +2087,7 @@ sub db_version ($) {
 
 sub db_run_file ($$) {
 
-	my $dbh = shift;
-	my $filename = shift;
+	my ($dbh, $filename) = @_;
 
 	my $f = undef;
 	if ( ! open ($f, '<', $filename) ) {
