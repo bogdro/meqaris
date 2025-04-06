@@ -38,7 +38,7 @@ if ( test $month -lt 10 ); then
 fi
 if ( test $month -eq 13 ); then
 	month="01";
-	year=$((`date +%Y` + 1))
+	year=$((year + 1))
 fi
 
 inifile=meqaris-test.ini
