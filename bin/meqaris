@@ -783,7 +783,7 @@ if ( ! $res ) {
 
 my $processed = 0;
 my $dberr = undef;
-my %replied_attenddees = ();
+my %replied_attendees = ();
 
 log_trace 'Processing message parts.';
 
@@ -1019,7 +1019,7 @@ for my $p (@parts) {
 				# Get the raw e-mail address:
 				($reply_sender = val($attendee)) =~ s/^mailto://io;
 				# just one response per attendee:
-				if ( defined ($replied_attenddees{$reply_sender}) ) {
+				if ( defined ($replied_attendees{$reply_sender}) ) {
 
 					log_info "Participant '$reply_sender' already replied, skipping.";
 					next;
@@ -1664,7 +1664,7 @@ sub send_accept ($$$$$$$) {
 	my $processed = send_mail ($event, $reply_sender,
 		$organizer_mail, 'Accepted', $response_details);
 
-	$replied_attenddees{$reply_sender} = 1;
+	$replied_attendees{$reply_sender} = 1;
 	return $processed;
 }
 
@@ -1680,7 +1680,7 @@ sub send_decline ($$$$$$) {
 	my $processed = send_mail ($event, $reply_sender,
 		$organizer_mail, 'Declined', $response_details);
 
-	$replied_attenddees{$reply_sender} = 1;
+	$replied_attendees{$reply_sender} = 1;
 	return $processed;
 }
 
@@ -1703,7 +1703,7 @@ sub process_insert_error($$$$$) {
 	my $processed = send_decline ($event, $attendee, $organizer_mail,
 		$updating, $reply_sender, \@response_details);
 
-	$replied_attenddees{$reply_sender} = 1;
+	$replied_attendees{$reply_sender} = 1;
 	return $processed;
 }
 
