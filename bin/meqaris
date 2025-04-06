@@ -1736,6 +1736,7 @@ sub insert_event (\%) {
 	my $next = 0;
 	my $last = 0;
 	my @values_insert = ();
+	my $should_insert = 0;
 	my $stmth;
 
 	if ( defined ($params->{'start_string'}) && ! defined ($params->{'duration'}) ) {
@@ -1755,6 +1756,7 @@ sub insert_event (\%) {
 			$params->{'dt_start_conv'},
 			$params->{'dt_end_conv'},
 			$params->{'e_id'});
+		$should_insert = 1;
 	}
 	elsif ( defined ($params->{'dt_end_conv'}) ) {
 
@@ -1767,6 +1769,7 @@ sub insert_event (\%) {
 		@values_insert = ($res->{$reply_sender}->{'r_id'},
 			"[$params->{'dt_start_conv'}, $params->{'dt_end_conv'})",
 			$params->{'e_id'});
+		$should_insert = 1;
 	}
 	elsif ( defined ($params->{'duration'}) ) {
 
@@ -1781,6 +1784,7 @@ sub insert_event (\%) {
 			defined ($params->{'start_string'})? $params->{'start_string'} : $params->{'dt_start_conv'},
 			val ($params->{'duration'}),
 			$params->{'e_id'});
+		$should_insert = 1;
 	}
 	else {
 		my $msg = 'Neither DTEND nor DURATION defined in a recurring event or none of: '
@@ -1794,24 +1798,26 @@ sub insert_event (\%) {
 			$reply_sender, \@response_details);
 		$next = 1;
 	}
-	if ( $stmth ) {
+	if ( $should_insert ) {
+		if ( $stmth ) {
 
-		$stmth->execute(@values_insert);
-		if ( $dbh->errstr ) {
+			$stmth->execute(@values_insert);
+			if ( $dbh->errstr ) {
 
+				$processed = process_insert_error ($params->{'event'},
+					$params->{'attendee'}, $params->{'organizer_mail'},
+					$params->{'updating'}, $reply_sender);
+				$was_err = 1;
+				$last = 1;
+			}
+		}
+		else {
 			$processed = process_insert_error ($params->{'event'},
 				$params->{'attendee'}, $params->{'organizer_mail'},
 				$params->{'updating'}, $reply_sender);
 			$was_err = 1;
 			$last = 1;
 		}
-	}
-	else {
-		$processed = process_insert_error ($params->{'event'},
-			$params->{'attendee'}, $params->{'organizer_mail'},
-			$params->{'updating'}, $reply_sender);
-		$was_err = 1;
-		$last = 1;
 	}
 	return ($processed, $was_err, $next, $last);
 }
