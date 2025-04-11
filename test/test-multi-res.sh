@@ -66,6 +66,6 @@ echo $res | grep "$year-$month-01 17:30:00"
 echo $res | grep "$year-$month-01 18:00:00"
 echo $res | grep "$resource2"
 
-rm -f $test_log
+if [-n "$delete_log"]; then rm -f $test_log; fi
 
 exit 0

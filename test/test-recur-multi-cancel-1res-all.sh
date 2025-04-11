@@ -101,6 +101,6 @@ res=`$psql -c \
 # where e_summary = '$subject' and e_uid = '$uid'
 (echo $res | grep "$uid") && exit 1
 
-rm -f $test_log
+if [-n "$delete_log"]; then rm -f $test_log; fi
 
 exit 0

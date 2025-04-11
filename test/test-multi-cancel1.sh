@@ -73,6 +73,6 @@ echo $res | grep "$subject"
 echo $res | grep "$uid"
 echo $res | grep "$resource1"
 
-rm -f $test_log
+if [-n "$delete_log"]; then rm -f $test_log; fi
 
 exit 0
