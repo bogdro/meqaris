@@ -77,6 +77,6 @@ res=`$psql -c \
 (echo $res | grep "$subject") && exit 2
 (echo $res | grep "$uid") && exit 3
 
-if [-n "$delete_log"]; then rm -f $test_log; fi
+if [ -n "$delete_log" ]; then rm -f $test_log; fi
 
 exit 0

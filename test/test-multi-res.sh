@@ -21,7 +21,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# Test for creating an event
+# Test for creating an event for multiple resources
 
 . test-func.bash
 
@@ -48,6 +48,7 @@ grep "^From: .* <$resource2>" $test_log
 grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
+check_status_code $test_log '2.0'
 
 res=`$psql -c \
 	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
@@ -66,6 +67,6 @@ echo $res | grep "$year-$month-01 17:30:00"
 echo $res | grep "$year-$month-01 18:00:00"
 echo $res | grep "$resource2"
 
-if [-n "$delete_log"]; then rm -f $test_log; fi
+if [ -n "$delete_log" ]; then rm -f $test_log; fi
 
 exit 0

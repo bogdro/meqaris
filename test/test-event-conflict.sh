@@ -66,6 +66,7 @@ grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
 grep 'The resource is booked in the selected period.' $test_log
+check_status_code $test_log '4.0'
 
 # In negative tests, check all entries in case just one condition matches
 res=`$psql -c \
@@ -74,6 +75,6 @@ res=`$psql -c \
 (echo $res | grep "$subject") && exit 1
 (echo $res | grep "$uid") && exit 2
 
-if [-n "$delete_log"]; then rm -f $test_log; fi
+if [ -n "$delete_log" ]; then rm -f $test_log; fi
 
 exit 0

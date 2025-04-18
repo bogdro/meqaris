@@ -50,6 +50,7 @@ grep "^From: .* <$resource2>" $test_log
 grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
+check_status_code $test_log '2.0'
 
 # Make sure the event being cancelled exists:
 res=`$psql -c \
@@ -83,6 +84,6 @@ res=`$psql -c \
 (echo $res | grep "$resource1") && exit 4
 (echo $res | grep "$resource2") && exit 5
 
-if [-n "$delete_log"]; then rm -f $test_log; fi
+if [ -n "$delete_log" ]; then rm -f $test_log; fi
 
 exit 0

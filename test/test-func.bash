@@ -26,7 +26,7 @@ set -x
 
 cwd=`pwd`
 meqaris='perl -Mwarnings=FATAL ../bin/meqaris --conf meqaris-test.ini'
-delete_log=1
+delete_log=
 
 organizer_mail='someone@localhost'
 from="someone <someone@localhost>"
@@ -49,6 +49,13 @@ logfile=meqaris-test.log
 db_user=meqaris
 db_name=meqaris-test
 psql="psql -U $db_user -d $db_name -t"
+
+check_status_code()
+{
+	test_logfile=$1
+	code=$2
+	sed -n '/base64/,/-----/ p' $test_logfile | head -n -2 | tail -n +2 | base64 -d | grep "REQUEST-STATUS:$code"
+}
 
 init_l4p_force()
 {

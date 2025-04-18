@@ -83,6 +83,6 @@ res=`$psql -c \
 (echo $res | grep "$resource1") && exit 4
 (echo $res | grep "$resource2") && exit 5
 
-if [-n "$delete_log"]; then rm -f $test_log; fi
+if [ -n "$delete_log" ]; then rm -f $test_log; fi
 
 exit 0
