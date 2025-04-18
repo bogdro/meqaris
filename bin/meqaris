@@ -42,7 +42,7 @@ my $meqaris_dbversion = 7;
 
 sub send_mail ($$$$@);
 sub send_accept ($$$$$$$);
-sub send_decline ($$$$$$);
+sub send_decline($$$$$$$);
 sub process_insert_error ($$$$$);
 sub insert_event (\%);
 sub notify_caldav ($$$$$);
@@ -1125,7 +1125,7 @@ for my $p (@parts) {
 							push @response_details, 'You are not the organizer of the attached event.';
 							push @response_details, "The attached event's organizer is '$organizer_mail'.";
 							$processed = send_decline ($event, $attendee, $organizer_mail,
-								$updating, $reply_sender, \@response_details);
+								$updating, $reply_sender, \@response_details, '3.8');
 							next AT;
 						}
 						log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
@@ -1138,7 +1138,7 @@ for my $p (@parts) {
 							push @response_details, 'You are not the organizer of the updated event.';
 							push @response_details, "The updated event's original organizer is '$organizer_mail'.";
 							$processed = send_decline ($event, $attendee, $organizer_mail,
-								$updating, $reply_sender, \@response_details);
+								$updating, $reply_sender, \@response_details, '3.8');
 							next AT;
 						}
 						log_debug "Sender '$sender_mail' is the same organizer as in the database. Deleting old event.";
@@ -1166,7 +1166,7 @@ for my $p (@parts) {
 							push @response_details, 'Unable to delete the event being updated.';
 							push @response_details, "The database error is:\n" . $dberr;
 							$processed = send_decline ($event, $attendee, $organizer_mail,
-								$updating, $reply_sender, \@response_details);
+								$updating, $reply_sender, \@response_details, '5.1');
 							next AT;
 						}
 					} # for my $old_event (@old_events)
@@ -1225,7 +1225,7 @@ for my $p (@parts) {
 							log_info 'The event has an infinite number of occurrences - declining.';
 							push @response_details, 'The event has an infinite number of occurrences. Please specify either a finite number of occurrences or an ending date.';
 							$processed = send_decline ($event, $attendee, $organizer_mail,
-								$updating, $reply_sender, \@response_details);
+								$updating, $reply_sender, \@response_details, '3.6');
 							next AT; # decline by each attendee
 						}
 						# start transaction for the INSERTs if not in one already
@@ -1291,7 +1291,7 @@ for my $p (@parts) {
 					log_info 'Resource disabled - declining.';
 					push @response_details, 'The resource you selected has been disabled.';
 					$processed = send_decline ($event, $attendee, $organizer_mail,
-						$updating, $reply_sender, \@response_details);
+						$updating, $reply_sender, \@response_details, '5.1');
 					next AT;
 				}
 			} # for my $attendee
@@ -1657,6 +1657,7 @@ sub send_accept ($$$$$$$) {
 		$reply_sender, $response_details, $uid) = @_;
 
 	$attendee->parameters->{'PARTSTAT'} = 'ACCEPTED';
+	$event->add_property('REQUEST-STATUS', '2.0');
 	$dbh->commit if $updating;
 	my ($caldav_ret, $caldav_response_details)
 		= notify_caldav ('PUT', $event, $reply_sender, $uid, undef);
@@ -1670,13 +1671,14 @@ sub send_accept ($$$$$$$) {
 
 # ============================ send_decline ===================================
 
-sub send_decline ($$$$$$) {
+sub send_decline ($$$$$$$) {
 
 	my ($event, $attendee, $organizer_mail, $updating,
-		$reply_sender, $response_details) = @_;
+		$reply_sender, $response_details, $req_status) = @_;
 
 	$dbh->rollback if $updating;
 	$attendee->parameters->{'PARTSTAT'} = 'DECLINED';
+	$event->add_property('REQUEST-STATUS', $req_status);
 	my $processed = send_mail ($event, $reply_sender,
 		$organizer_mail, 'Declined', $response_details);
 
@@ -1690,18 +1692,21 @@ sub process_insert_error($$$$$) {
 
 	my ($event, $attendee, $organizer_mail, $updating, $reply_sender) = @_;
 	my @response_details = ();
+	my $req_status = '5.1';
 
 	log_error "Error inserting new event:\n" . $dbh->errstr . "\n- declining.";
 	push @response_details, 'Unable to insert the event.';
 	if ( $dbh->errstr =~ /rr_interval_excl/o ) {
 		push @response_details, 'The resource is booked in the selected period.';
+		$req_status = '4.0';
 	}
 	elsif ( $dbh->errstr =~ /rr_interval_in_future/o ) {
 		push @response_details, 'You tried to create an event in the past.';
+		$req_status = '3.5';
 	}
 	push @response_details, "The database error is:\n" . $dbh->errstr;
 	my $processed = send_decline ($event, $attendee, $organizer_mail,
-		$updating, $reply_sender, \@response_details);
+		$updating, $reply_sender, \@response_details, $req_status);
 
 	$replied_attendees{$reply_sender} = 1;
 	return $processed;
@@ -1777,7 +1782,7 @@ sub insert_event (\%) {
 		push @response_details, $msg;
 		$processed = send_decline ($params->{'event'}, $params->{'attendee'},
 			$params->{'organizer_mail'}, $params->{'updating'},
-			$reply_sender, \@response_details);
+			$reply_sender, \@response_details, '3.11');
 		$next = 1;
 	}
 	if ( $should_insert ) {
