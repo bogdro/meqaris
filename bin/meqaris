@@ -796,7 +796,7 @@ for my $p (@parts) {
 	# bodyhandle() runs the decoding, as_string() doesn't
 	my $orig_invitation = $p->bodyhandle->as_string;
 	log_debug "Message from '$sender' with subject '$subject' contains this iCalendar:\n" .
-		"-----\n" . substr($orig_invitation, 0, 1000) . "\n------";
+		"-----\n" . substr($orig_invitation, 0, 5000) . "\n[...]\n------";
 
 	my $ical = Data::ICal->new(data => $orig_invitation);
 
