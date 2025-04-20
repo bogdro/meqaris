@@ -802,13 +802,7 @@ for my $p (@parts) {
 
 	# Check the method property. ARRAY! List context required!
 	my ($method) = prop_array($ical, 'METHOD');
-	if ( val($method) ne 'REQUEST' and val($method) ne 'CANCEL' ) {
-
-		log_warn " Message from '$sender' with subject '$subject'" .
-			" contains an iCalendar, but its method '" .
-			val($method) . "' is unsupported. Skipping.";
-		next;
-	}
+	my $method_name = val($method);
 
 	# Read the time zones, if any:
 	log_trace 'Processing iCalendar time zones.';
@@ -852,7 +846,6 @@ for my $p (@parts) {
 		($organizer_mail = val($organizer)) =~ s/^mailto://io;
 
 		log_info "Got event with organizer='" . val ($organizer) . "'";
-		my $method_name = val ($method);
 		if ( $method_name eq 'REQUEST' ) {
 
 			log_trace 'The iCalendar is a REQUEST.';
@@ -1495,6 +1488,26 @@ for my $p (@parts) {
 				log_error "Error deleting event from the database:\n" . $dbh->errstr;
 			}
 		} # 'CANCEL'
+		else {
+			if ( defined ($event->property('attendee')) ) {
+				my @attendees = @{$event->property('attendee')};
+				if ( @attendees > 0 ) {
+					# Named attendees present - delete the
+					# event just for them and not for all
+					for my $attendee (@attendees) {
+
+						# Get the raw e-mail address:
+						($reply_sender = val($attendee)) =~ s/^mailto://io;
+						log_warn " Message from '$sender' with subject '$subject'" .
+							" contains an iCalendar, but its method '" .
+							$method_name . "' is unsupported. Skipping.";
+						push @response_details, "Unsupported method '$method_name'.";
+						$processed = send_decline ($event, $attendee, $organizer_mail,
+							0, $reply_sender, \@response_details, '5.0');
+					}
+				}
+			}
+		}
 	} # event loop
 	# Process just one invitation per each e-mail. Various mail clients
 	# may send the same invitation using different MIME types, so reply
