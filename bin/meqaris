@@ -826,6 +826,7 @@ for my $p (@parts) {
 	# Process events:
 	EV: for my $event (@vevents) {
 
+		%replied_attendees = ();
 		Log::Log4perl::NDC->remove();
 		if ( ! defined ($event->property('uid')) ) {
 
