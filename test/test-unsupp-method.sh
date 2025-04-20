@@ -30,8 +30,8 @@ test_log=test-unsupp-method.log
 uid=test_uid_000041
 resource=room403@localhost
 subject="Event $uid $RANDOM"
-dtstart="21000101T120000"
-dtend="21000101T123000"
+dtstart="$year${month}01T120000"
+dtend="$year${month}01T123000"
 
 ./create-mail --attendee "$resource:mailto:$resource" \
 	--dtstart $dtstart --dtend $dtend --from "$from" \
