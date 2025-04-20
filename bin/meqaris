@@ -1490,6 +1490,9 @@ for my $p (@parts) {
 			}
 		} # 'CANCEL'
 		else {
+			log_warn " Message from '$sender' with subject '$subject'" .
+				" contains an iCalendar, but its method '" .
+				$method_name . "' is unsupported. Skipping.";
 			if ( defined ($event->property('attendee')) ) {
 				my @attendees = @{$event->property('attendee')};
 				if ( @attendees > 0 ) {
@@ -1499,9 +1502,12 @@ for my $p (@parts) {
 
 						# Get the raw e-mail address:
 						($reply_sender = val($attendee)) =~ s/^mailto://io;
-						log_warn " Message from '$sender' with subject '$subject'" .
-							" contains an iCalendar, but its method '" .
-							$method_name . "' is unsupported. Skipping.";
+						# just one response per attendee:
+						if ( defined ($replied_attendees{$reply_sender}) ) {
+
+							log_info "Participant '$reply_sender' already replied, skipping.";
+							next;
+						}
 						push @response_details, "Unsupported method '$method_name'.";
 						$processed = send_decline ($event, $attendee, $organizer_mail,
 							0, $reply_sender, \@response_details, '5.0');
