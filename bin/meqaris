@@ -837,16 +837,15 @@ for my $p (@parts) {
 		Log::Log4perl::NDC->push(val ($uid));
 		log_trace 'Got UID.';
 
-		if ( ! defined ($event->property('organizer')) ) {
+		my $organizer_mail = '';
+		if ( defined ($event->property('organizer')) ) {
 
-			log_warn 'Event contains no organizer - ignoring.';
-			next;
+			my ($organizer) = prop_array($event, 'organizer');
+			($organizer_mail = val($organizer)) =~ s/^mailto://io;
+			$organizer_mail = '' if ! defined ($organizer_mail);
 		}
-		my ($organizer) = prop_array($event, 'organizer');
-		my $organizer_mail = undef;
-		($organizer_mail = val($organizer)) =~ s/^mailto://io;
 
-		log_info "Got event with organizer='" . val ($organizer) . "'";
+		log_info "Got event with organizer='" . $organizer_mail . "'";
 		if ( $method_name eq 'REQUEST' ) {
 
 			log_trace 'The iCalendar is a REQUEST.';
