@@ -1035,6 +1035,14 @@ for my $p (@parts) {
 					next;
 				}
 				log_debug "Attendee '$reply_sender' found";
+				if ( ! $organizer_mail ) {
+
+					log_info "Missing event organizer: '$organizer_mail' - declining.";
+					push @response_details, 'Missing event organizer.';
+					$processed = send_decline ($event, $attendee, $organizer_mail,
+						$updating, $reply_sender, \@response_details, '3.11');
+					next AT;
+				}
 				# check if resource is enabled:
 				if ( $res->{$reply_sender}->{'r_enabled'} ) {
 
@@ -1492,7 +1500,7 @@ for my $p (@parts) {
 		else {
 			log_warn " Message from '$sender' with subject '$subject'" .
 				" contains an iCalendar, but its method '" .
-				$method_name . "' is unsupported. Skipping.";
+				$method_name . "' is unsupported. Declining.";
 			if ( defined ($event->property('attendee')) ) {
 				my @attendees = @{$event->property('attendee')};
 				if ( @attendees > 0 ) {
