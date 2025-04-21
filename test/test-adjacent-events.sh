@@ -30,8 +30,8 @@ test_log=test-adjacent-events.log
 uid=test_uid_000042
 resource=room403@localhost
 subject="Event $uid $RANDOM"
-dtstart="$year${month}01T104500"
-dtend="$year${month}01T110000"
+dtstart="$year${month}01T180000"
+dtend="$year${month}01T181500"
 
 ./create-mail --attendee "$resource:mailto:$resource" \
 	--dtstamp 20000101T010203 --seq 1 \
@@ -56,8 +56,8 @@ echo $res | grep "$uid"
 
 uid=test_uid_000043
 subject="Event $uid $RANDOM"
-dtstart="$year${month}01T110000"
-dtend="$year${month}01T113000"
+dtstart="$year${month}01T181500"
+dtend="$year${month}01T183000"
 
 ./create-mail --attendee "$resource:mailto:$resource" \
 	--dtstamp 20000101T020304 --seq 2 \
@@ -81,9 +81,9 @@ echo $res | grep "$uid"
 
 res=`$psql -c \
 	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id where r_email = '$resource';"`;
-echo $res | grep "$year-$month-01 10:45:00"
-echo $res | grep "$year-$month-01 11:00:00"
-echo $res | grep "$year-$month-01 11:30:00"
+echo $res | grep "$year-$month-01 18:00:00"
+echo $res | grep "$year-$month-01 18:15:00"
+echo $res | grep "$year-$month-01 18:30:00"
 echo $res | grep "$resource"
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi
