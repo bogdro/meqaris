@@ -71,6 +71,7 @@ set -x
 ./test-recur-multi-cancel-allres-allrec-status.sh
 ./test-unsupp-method.sh
 ./test-adjanced-events.sh
+./test-disabled.sh
 
 $meqaris --destroy-db
 rm -f $l4p_config $logfile $inifile
