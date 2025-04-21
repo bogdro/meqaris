@@ -72,6 +72,7 @@ set -x
 ./test-unsupp-method.sh
 ./test-adjacent-events.sh
 ./test-disabled.sh
+./test-no-organiser.sh
 
 $meqaris --destroy-db
 rm -f $l4p_config $logfile $inifile

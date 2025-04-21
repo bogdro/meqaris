@@ -107,7 +107,7 @@ if ( $help ) {
 }
 
 if ( is_empty($dtstart)
-	or is_empty($from) or is_empty($organizer) or is_empty($subject)
+	or is_empty($from) or is_empty($subject)
 	or is_empty($to) or is_empty($uid) ) {
 
 	print "Missing parameter.\n";

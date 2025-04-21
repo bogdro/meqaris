@@ -25,7 +25,7 @@
 
 . test-func.bash
 
-test_log=test-adjanced-events.log
+test_log=test-adjacent-events.log
 
 uid=test_uid_000042
 resource=room403@localhost

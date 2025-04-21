@@ -21,13 +21,13 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# Test for an event to a disabled resource
+# Test for an event with no organiser
 
 . test-func.bash
 
-test_log=test-disabled.log
+test_log=test-no-organiser.log
 
-uid=test_uid_000044
+uid=test_uid_000045
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T120000"
@@ -37,7 +37,7 @@ $meqaris --disable 'Room 403'
 
 ./create-mail --attendee "$resource:mailto:$resource" \
 	--dtstart $dtstart --dtend $dtend --from "$from" \
-	--organizer "$organizer" --subject "$subject" \
+	--organizer "" --subject "$subject" \
 	--to "sth <$resource>" --uid $uid \
 | \
 $meqaris > $test_log
@@ -45,11 +45,10 @@ $meqaris > $test_log
 grep "^Subject: Declined: $subject" $test_log
 grep "^Declined: $subject" $test_log
 grep "^From: .* <$resource>" $test_log
-grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
-grep 'The resource you selected has been disabled' $test_log
-check_status_code $test_log '5.1'
+grep 'Missing event organizer' $test_log
+check_status_code $test_log '3.11'
 
 # In negative tests, check all entries in case just one condition matches
 res=`$psql -c \
