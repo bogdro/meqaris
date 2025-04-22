@@ -74,6 +74,7 @@ set -x
 ./test-disabled.sh
 ./test-no-organiser.sh
 ./test-cancel-no-exist.sh
+./test-multi-same-res.sh
 
 $meqaris --destroy-db
 rm -f $l4p_config $logfile $inifile
