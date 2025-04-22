@@ -73,6 +73,7 @@ set -x
 ./test-adjacent-events.sh
 ./test-disabled.sh
 ./test-no-organiser.sh
+./test-cancel-no-exist.sh
 
 $meqaris --destroy-db
 rm -f $l4p_config $logfile $inifile
