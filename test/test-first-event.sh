@@ -49,6 +49,7 @@ grep "^From: .* <$resource>" $test_log
 grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
+check_status_code $test_log '2.0'
 
 check_event_with_subject_and_uid "$subject" "$uid"
 
@@ -57,7 +58,6 @@ res=`$psql -c \
 echo $res | grep "$year-$month-01 12:00:00"
 echo $res | grep "$year-$month-01 12:30:00"
 echo $res | grep "$resource"
-check_status_code $test_log '2.0'
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi
 
