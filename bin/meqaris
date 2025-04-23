@@ -828,13 +828,13 @@ for my $p (@parts) {
 
 		%replied_attendees = ();
 		Log::Log4perl::NDC->remove();
-		if ( ! defined ($event->property('uid')) ) {
+		my $ev_uid = undef;
+		if ( defined($event->property('uid')) ) {
 
-			log_warn 'Event contains no UID - ignoring.';
-			next;
+			my($uid) = prop_array($event, 'uid');
+			$ev_uid = val($uid);
+			Log::Log4perl::NDC->push($ev_uid);
 		}
-		my ($uid) = prop_array($event, 'uid');
-		Log::Log4perl::NDC->push(val ($uid));
 		log_trace 'Got UID.';
 
 		my $organizer_mail = '';
@@ -1036,8 +1036,16 @@ for my $p (@parts) {
 				log_debug "Attendee '$reply_sender' found";
 				if ( ! $organizer_mail ) {
 
-					log_info "Missing event organizer: '$organizer_mail' - declining.";
+					log_info "Missing event organizer - declining.";
 					push @response_details, 'Missing event organizer.';
+					$processed = send_decline ($event, $attendee, $organizer_mail,
+						$updating, $reply_sender, \@response_details, '3.11');
+					next AT;
+				}
+				if ( ! $ev_uid ) {
+
+					log_info "Missing event UID - declining.";
+					push @response_details, 'Missing event UID.';
 					$processed = send_decline ($event, $attendee, $organizer_mail,
 						$updating, $reply_sender, \@response_details, '3.11');
 					next AT;
@@ -1071,7 +1079,7 @@ for my $p (@parts) {
 					# Attendee found and enabled. Check if this is an update.
 					# NOTE: we MUST check the e-mail, otherwise the same UID can cause
 					# skipping adding the same event to other resources!
-					my @values_find_del = (val ($uid), $reply_sender, defined ($dtstamp_conv)? $dtstamp_conv : undef);
+					my @values_find_del = ($ev_uid, $reply_sender, defined ($dtstamp_conv)? $dtstamp_conv : undef);
 					my @old_events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems not to work
 						db_stmt ($dbh, 'select e_id, e_organiser, coalesce (e_seq, 0) as e_seq,'
 							. ' e_dtstamp, cast (coalesce ($3, \'19700101T010101Z\') as timestamp with time zone) as new_dtstamp'
@@ -1179,10 +1187,10 @@ for my $p (@parts) {
 					if ( $stmth ) {
 
 						$stmth->execute(
-							val_limit ($organizer_mail),
-							val_limit (val ($summary)),
+							val_limit($organizer_mail),
+							val_limit(val ($summary)),
 							$dtstamp_conv,
-							val_limit (val ($uid)),
+							val_limit($ev_uid),
 							(defined ($sequence))? $sequence->value : 0,
 							encode_base64 ($orig_invitation)
 						);
@@ -1266,7 +1274,7 @@ for my $p (@parts) {
 
 							log_info "Inserted recurring event for attendee '$reply_sender'.";
 							$processed = send_accept ($event, $attendee, $organizer_mail,
-								$updating, $reply_sender, \@response_details, val ($uid));
+								$updating, $reply_sender, \@response_details, $ev_uid);
 						}
 						# NOTE: recurring event inserted - do not proceed with the normal!
 						next AT;
@@ -1283,7 +1291,7 @@ for my $p (@parts) {
 
 						log_info "Inserted for attendee '$reply_sender'.";
 						$processed = send_accept ($event, $attendee, $organizer_mail,
-							$updating, $reply_sender, \@response_details, val ($uid));
+							$updating, $reply_sender, \@response_details, $ev_uid);
 						next AT;
 					}
 				}
@@ -1305,7 +1313,7 @@ for my $p (@parts) {
 			# exists, check if sender is the organiser
 			# and if the organiser in the cancellation
 			# request is the organiser of the original event
-			if ( ! defined ($uid) ) {
+			if ( ! defined($ev_uid) ) {
 
 				# should never be entered
 				log_warn 'Event UID not defined, cannot delete - ignoring.';
@@ -1319,7 +1327,7 @@ for my $p (@parts) {
 				next;
 			}
 			log_debug "Sender '$sender_mail' is event's organizer '$organizer_mail'.";
-			my @values_cancel = (val ($uid));
+			my @values_cancel = ($ev_uid);
 			log_trace 'Searching the database for the event to cancel.';
 			my @events = @{ $dbh->selectall_arrayref ( # NOTE: selectall_hashref seems NOT to work
 				db_stmt ($dbh, 'select e_id, e_organiser from meqaris.meq_events where e_uid = $1'),
@@ -1355,16 +1363,16 @@ for my $p (@parts) {
 				. 'join meqaris.meq_resource_reservations on rr_r_id = r_id '
 				. 'join meqaris.meq_events on e_id = rr_e_id '
 				. 'where e_uid = $1'
-				), { Slice => {} }, (val ($uid)));
+				), { Slice => {} }, ($ev_uid));
 			if ( $event_status eq 'CANCELLED' ) {
 				# CANCELLED status means to cancel all
 				$sql = 'delete from meqaris.meq_events where e_uid = $1'; # foreign key cascades this
-				@values_cancel = (val ($uid));
+				@values_cancel = ($ev_uid);
 			}
 			else {
 				$sql = 'delete from meqaris.meq_resource_reservations where rr_e_id in '
 					. '(select e_id from meqaris.meq_events where e_uid = $1)';
-				@values_cancel = (val ($uid));
+				@values_cancel = ($ev_uid);
 				if ( defined ($recurr_id) ) {
 
 					log_trace 'Deleting just a RECURRENCE-ID.';
@@ -1408,7 +1416,7 @@ for my $p (@parts) {
 					if ( $event_status eq 'CANCELLED' ) {
 						log_trace 'Deleting the whole event from CalDAV.';
 						notify_caldav ('DEL', $event, undef,
-							val ($uid), $caldav_servers);
+							$ev_uid, $caldav_servers);
 					}
 					else {
 						# partial delete
@@ -1424,7 +1432,7 @@ for my $p (@parts) {
 									log_trace "Deleting from CalDAV for '$reply_sender'.";
 									if ( ! defined ($recurr_id) ) {
 										notify_caldav ('DEL', $event,
-											$reply_sender, val ($uid),
+											$reply_sender, $ev_uid,
 											$caldav_servers);
 									}
 									else {
@@ -1472,7 +1480,7 @@ for my $p (@parts) {
 
 												my ($caldav_ret, undef)
 													= notify_caldav ('PUT', $entry,
-														$reply_sender, val ($uid),
+														$reply_sender, $ev_uid,
 														$caldav_servers);
 												last;
 											}
@@ -1482,12 +1490,12 @@ for my $p (@parts) {
 							}
 							else {
 								log_info 'Attendees empty - deleting the whole event from CalDAV.';
-								notify_caldav ('DEL', $event, undef, val ($uid), $caldav_servers);
+								notify_caldav ('DEL', $event, undef, $ev_uid, $caldav_servers);
 							}
 						}
 						else {
 							log_info 'Attendees not defined - deleting the whole event from CalDAV.';
-							notify_caldav ('DEL', $event, undef, val ($uid), $caldav_servers);
+							notify_caldav ('DEL', $event, undef, $ev_uid, $caldav_servers);
 						}
 					}
 				}
