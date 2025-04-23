@@ -33,12 +33,10 @@ subject="Event $uid $RANDOM"
 dtstart="$year${month}01T120000"
 dtend="$year${month}01T123000"
 
-$meqaris --disable 'Room 403'
-
 ./create-mail --attendee "$resource:mailto:$resource" \
 	--dtstart $dtstart --dtend $dtend --from "$from" \
 	--organizer "" --subject "$subject" \
-	--to "sth <$resource>" --uid $uid \
+	--to "room403 <$resource>" --uid $uid \
 | \
 $meqaris > $test_log
 
@@ -58,7 +56,5 @@ res=`$psql -c \
 (echo $res | grep "$uid") && exit 2
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi
-
-$meqaris --enable 'Room 403'
 
 exit 0
