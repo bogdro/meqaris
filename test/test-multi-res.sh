@@ -27,7 +27,7 @@
 
 test_log=test-multi-res.log
 
-uid=test_uid_000012
+uid=`printf test_uid_%06d $1`
 resource1=room403@localhost
 resource2=room404@localhost
 subject="Event $uid $RANDOM"

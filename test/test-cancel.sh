@@ -28,7 +28,7 @@
 test_log=test-cancel.log
 
 # the UID of the event being created and cancelled:
-uid=test_uid_000011
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T170000"

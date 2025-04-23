@@ -27,7 +27,7 @@
 
 test_log=test-recur-exrule.log
 
-uid=test_uid_000018
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}02T014500"

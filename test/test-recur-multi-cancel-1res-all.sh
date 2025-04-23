@@ -28,7 +28,7 @@
 
 test_log=test-recur-multi-cancel-1res-all.log
 
-uid=test_uid_000030
+uid=`printf test_uid_%06d $1`
 resource1=room403@localhost
 resource2=room404@localhost
 subject="Event $uid $RANDOM"

@@ -27,7 +27,7 @@
 
 test_log=test-event-conflict.log
 
-uid=test_uid_000034
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T114500"
@@ -42,7 +42,7 @@ $meqaris > $test_log
 
 check_event_with_subject_and_uid "$subject" "$uid"
 
-uid=test_uid_000035
+uid=`printf test_uid_%06d_2 $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T114000"

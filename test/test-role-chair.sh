@@ -27,7 +27,7 @@
 
 test_log=test-role-chair.log
 
-uid=test_uid_000005
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T140000"

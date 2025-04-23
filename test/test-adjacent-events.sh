@@ -27,7 +27,7 @@
 
 test_log=test-adjacent-events.log
 
-uid=test_uid_000042
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T180000"
@@ -50,7 +50,7 @@ grep 'method=REPLY' $test_log
 
 check_event_with_subject_and_uid "$subject" "$uid"
 
-uid=test_uid_000043
+uid=`printf test_uid_%06d_2 $1`
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T181500"
 dtend="$year${month}01T183000"

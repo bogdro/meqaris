@@ -27,7 +27,7 @@
 
 test_log=test-past.log
 
-uid=test_uid_000004
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="20000101T120000"

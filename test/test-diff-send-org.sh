@@ -27,7 +27,7 @@
 
 test_log=test-diff-send-org.log
 
-uid=test_uid_000010
+uid=`printf test_uid_%06d $1`
 organizer_mail='someone_else@localhost'
 from="someone <someone@localhost>"
 organizer="mailto:$organizer_mail"

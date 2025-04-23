@@ -27,7 +27,7 @@
 
 test_log=test-multi-res-unkn.log
 
-uid=test_uid_000048
+uid=`printf test_uid_%06d $1`
 resource1=room403@localhost
 resource2=doesnt_exist@localhost
 subject="Event $uid $RANDOM"

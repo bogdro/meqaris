@@ -27,7 +27,7 @@
 
 test_log=test-no-time.log
 
-uid=test_uid_000009
+uid=`printf test_uid_%06d $1`
 resource=room403@localhost
 subject="Event $uid $RANDOM"
 dtstart="$year${month}01T150000"
