@@ -66,12 +66,7 @@ $meqaris > $test_log
 grep "$subject" $test_log && exit 1
 
 # We're cancelling the whole event, so it should be gone.
-# In negative tests, check all entries in case just one condition matches
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events;"`
-# where e_summary = '$subject' and e_uid = '$uid'
-(echo $res | grep "$subject") && exit 2
-(echo $res | grep "$uid") && exit 3
+check_no_event_with_subject_and_uid "$subject" "$uid"
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi
 

@@ -50,12 +50,7 @@ grep 'method=REPLY' $test_log
 grep 'The event has an infinite number of occurrences' $test_log
 check_status_code $test_log '3.6'
 
-# In negative tests, check all entries in case just one condition matches
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events;"`
-# where e_summary = '$subject' and e_uid = '$uid'
-(echo $res | grep "$subject") && exit 1
-(echo $res | grep "$uid") && exit 2
+check_no_event_with_subject_and_uid "$subject" "$uid"
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi
 

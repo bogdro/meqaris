@@ -67,6 +67,19 @@ check_event_with_subject_and_uid()
 	echo $res | grep "$uid"
 }
 
+check_no_event_with_subject_and_uid()
+{
+	subject=$1
+	uid=$2
+	# In negative tests, check all entries in case just one condition matches
+	res=`$psql -c \
+		"select e_summary, e_dtstamp, e_uid from meqaris.meq_events;"`
+		# where e_summary = '$subject' and e_uid = '$uid'
+	(echo $res | grep "$subject") && exit 22
+	(echo $res | grep "$uid") && exit 23
+	return 0
+}
+
 init_l4p_force()
 {
 	cat > $l4p_config <<-L4J
