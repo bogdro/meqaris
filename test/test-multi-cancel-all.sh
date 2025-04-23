@@ -50,11 +50,7 @@ grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
 
-# Make sure the event being cancelled exists:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 # No attendees - should cancel for all
 ./create-mail \
@@ -69,10 +65,7 @@ $meqaris > $test_log
 grep "$subject" $test_log && exit 1
 
 # We're cancelling attendee-based, so the event should still exist:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 # We're cancelling for all attendees, so join with meqaris.meq_resource_reservations
 # to check if there remaining reservations are gone.

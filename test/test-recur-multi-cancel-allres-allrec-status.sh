@@ -53,10 +53,7 @@ grep 'method=REPLY' $test_log
 check_status_code $test_log '2.0'
 
 # Make sure the event being cancelled exists:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 # status CANCELLED - should cancel for all and delete the event
 ./create-mail --attendee "$resource:mailto:$resource" \

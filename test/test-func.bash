@@ -57,6 +57,16 @@ check_status_code()
 	sed -n '/base64/,/-----/ p' $test_logfile | head -n -2 | tail -n +2 | base64 -d | grep "REQUEST-STATUS:$code"
 }
 
+check_event_with_subject_and_uid()
+{
+	subject=$1
+	uid=$2
+	res=`$psql -c \
+		"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
+	echo $res | grep "$subject"
+	echo $res | grep "$uid"
+}
+
 init_l4p_force()
 {
 	cat > $l4p_config <<-L4J

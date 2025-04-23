@@ -40,11 +40,7 @@ dtend="$year${month}01T120000"
 | \
 $meqaris > $test_log
 
-# Make sure the event exists:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 uid=test_uid_000035
 resource=room403@localhost

@@ -51,10 +51,7 @@ grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
 check_status_code $test_log '2.0'
 
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 res=`$psql -c \
 	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id join meqaris.meq_events on e_id = rr_e_id where r_email = '$resource1' and e_uid = '$uid';"`;

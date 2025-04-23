@@ -41,11 +41,7 @@ dtend="$year${month}01T110000"
 | \
 $meqaris > $test_log
 
-# Make sure the event exists:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 dtstart="$year${month}01T103000"
 dtend="$year${month}01T104500"
@@ -66,10 +62,7 @@ grep "^To: $organizer_mail" $test_log
 grep "^CC: $from" $test_log
 grep 'method=REPLY' $test_log
 
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 res=`$psql -c \
 	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id where r_email = '$resource';"`;

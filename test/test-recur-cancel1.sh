@@ -42,10 +42,7 @@ dtend="$year${month}02T041500"
 $meqaris > $test_log
 
 # Make sure the event being cancelled exists:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 ./create-mail --attendee "$resource:mailto:$resource" \
 	--method CANCEL --recur-id "$year${month}05T040000" \
@@ -59,10 +56,7 @@ $meqaris > $test_log
 grep "$subject" $test_log && exit 1
 
 # We're cancelling just 1 recurrence, so the event should still exist:
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events where e_summary = '$subject' and e_uid = '$uid';"`
-echo $res | grep "$subject"
-echo $res | grep "$uid"
+check_event_with_subject_and_uid "$subject" "$uid"
 
 # We're cancelling just 1 recurrence, so join with meqaris.meq_resource_reservations
 # to check if there remaining reservations are in place.
