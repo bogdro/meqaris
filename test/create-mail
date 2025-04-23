@@ -106,9 +106,8 @@ if ( $help ) {
 	exit 0;
 }
 
-if ( is_empty($dtstart)
-	or is_empty($from) or is_empty($subject)
-	or is_empty($to) or is_empty($uid) ) {
+if ( is_empty($dtstart) or is_empty($from)
+	or is_empty($subject) or is_empty($to) ) {
 
 	print "Missing parameter.\n";
 	print_help();

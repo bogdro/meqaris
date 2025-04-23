@@ -76,6 +76,7 @@ set -x
 ./test-cancel-no-exist.sh
 ./test-multi-same-res.sh
 ./test-multi-res-unkn.sh
+./test-no-uid.sh
 
 $meqaris --destroy-db
 rm -f $l4p_config $logfile $inifile
