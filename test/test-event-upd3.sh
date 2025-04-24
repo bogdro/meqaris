@@ -61,8 +61,7 @@ grep "$subject" $test_log && exit 1
 check_event_with_subject_and_uid "$subject" "$uid"
 
 # Shouldn't be updated - should have the old event times
-res=`$psql -c \
-	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id where r_email = '$resource';"`;
+res=$(get_reserv_by_email $resource)
 echo $res | grep "$year-$month-01 11:00:00"
 echo $res | grep "$year-$month-01 11:15:00"
 echo $res | grep "$resource"

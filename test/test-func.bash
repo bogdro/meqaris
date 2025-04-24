@@ -80,6 +80,14 @@ check_no_event_with_subject_and_uid()
 	return 0
 }
 
+get_reserv_by_email()
+{
+	mail=$1
+	res=`$psql -c \
+		"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id where r_email = '$mail';"`;
+	echo "$res"
+}
+
 init_l4p_force()
 {
 	cat > $l4p_config <<-L4J

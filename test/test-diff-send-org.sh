@@ -53,8 +53,7 @@ check_status_code $test_log '2.0'
 
 check_event_with_subject_and_uid "$subject" "$uid"
 
-res=`$psql -c \
-	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id where r_email = '$resource';"`;
+res=$(get_reserv_by_email $resource)
 echo $res | grep "$year-$month-01 16:30:00"
 echo $res | grep "$year-$month-01 17:00:00"
 echo $res | grep "$resource"
