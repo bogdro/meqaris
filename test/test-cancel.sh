@@ -60,9 +60,7 @@ check_event_with_subject_and_uid "$subject" "$uid"
 
 # We're cancelling for just 1 attendee, so join with meqaris.meq_resource_reservations
 # to check if there aren't any actual reservations.
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events join meqaris.meq_resource_reservations on rr_e_id = e_id;"`
-# where e_summary = '$subject' and e_uid = '$uid'
+res=$(get_events_and_reservations)
 (echo $res | grep "$uid") && exit 1
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi

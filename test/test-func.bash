@@ -123,6 +123,14 @@ get_event_by_summary_uid()
 	echo "$res"
 }
 
+get_events_and_reservations()
+{
+	res=`$psql -c \
+		"select e_summary, e_dtstamp, e_uid from meqaris.meq_events \
+		join meqaris.meq_resource_reservations on rr_e_id = e_id;"`
+	echo "$res"
+}
+
 init_l4p_force()
 {
 	cat > $l4p_config <<-L4J
