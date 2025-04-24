@@ -29,8 +29,25 @@ name='CalDAV1'
 url='http://Cal_DAV_1'
 $meqaris --add-caldav-server "$url" --name "$name"
 
-res=`$psql -c \
-	"select cals_name, cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers;"`
+get_caldav_servers()
+{
+	mail=$1
+	res=`$psql -c \
+		"select cals_name, cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers;"`
+	echo "$res"
+}
+
+get_caldav_servers_and_resources()
+{
+	res=`$psql -c \
+		"select r_email, cals_name, cals_url, cals_username, cals_password, cals_realm \
+		from meqaris.meq_caldav_servers \
+		join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id \
+		join meqaris.meq_resources on r_id = calres_r_id;"`
+	echo "$res"
+}
+
+res=$(get_caldav_servers)
 echo $res | grep "$name"
 echo $res | grep "$url"
 
@@ -42,8 +59,7 @@ pass=c2pass
 realm=dav2_realm
 $meqaris --update-caldav-server "$name" --name "$name2" --user "$user" --password "$pass" --realm "$realm"
 
-res=`$psql -c \
-	"select cals_name, cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers;"`
+res=$(get_caldav_servers)
 echo $res | grep "$name2"
 echo $res | grep "$url"
 echo $res | grep "$user"
@@ -56,8 +72,7 @@ $meqaris --create "$res_name" --email "$res_email"
 
 $meqaris --add-caldav-resource "$name2" --name "$res_name"
 
-res=`$psql -c \
-	"select r_email, cals_name, cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id join meqaris.meq_resources on r_id = calres_r_id;"`
+res=$(get_caldav_servers_and_resources)
 echo $res | grep "$name2"
 echo $res | grep "$url"
 echo $res | grep "$user"
@@ -67,15 +82,13 @@ echo $res | grep "$res_email"
 
 $meqaris --delete-caldav-resource "$name2" --name "$res_name"
 
-res=`$psql -c \
-	"select r_email, cals_name, cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers join meqaris.meq_caldav_servers_resources on calres_cals_id = cals_id join meqaris.meq_resources on r_id = calres_r_id;"`
+res=$(get_caldav_servers_and_resources)
 (echo $res | grep "$name2") && exit 1
 (echo $res | grep "$res_email") && exit 2
 
 $meqaris --delete-caldav-server "$name2"
 
-res=`$psql -c \
-	"select cals_name, cals_url, cals_username, cals_password, cals_realm from meqaris.meq_caldav_servers;"`
+res=$(get_caldav_servers)
 (echo $res | grep "$name2") && exit 3
 
 exit 0
