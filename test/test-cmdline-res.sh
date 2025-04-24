@@ -29,8 +29,22 @@ name='Room 406'
 email=room406@localhost
 $meqaris --create "$name" --email "$email"
 
-res=`$psql -c \
-	"select r_name, r_email, r_description from meqaris.meq_resources;"`
+get_resources()
+{
+	mail=$1
+	res=`$psql -c "select r_name, r_email, r_description from meqaris.meq_resources;"`
+	echo "$res"
+}
+
+get_resource_by_email()
+{
+	mail=$1
+	res=`$psql -c \
+		"select r_name, r_email, r_description, r_enabled from meqaris.meq_resources where r_email = '$mail';"`
+	echo "$res"
+}
+
+res=$(get_resources)
 echo $res | grep "$name"
 echo $res | grep "$email"
 
@@ -38,8 +52,7 @@ desc='room_406'
 email=room405@localhost
 $meqaris --update "$name" --email "$email" --description "$desc"
 
-res=`$psql -c \
-	"select r_name, r_email, r_description from meqaris.meq_resources;"`
+res=$(get_resources)
 echo $res | grep "$name"
 echo $res | grep "$email"
 echo $res | grep "$desc"
@@ -47,28 +60,24 @@ echo $res | grep "$desc"
 name2='Room 405'
 $meqaris --update "$name" --name "$name2" --email "$email" --description "$desc"
 
-res=`$psql -c \
-	"select r_name, r_email, r_description from meqaris.meq_resources;"`
+res=$(get_resources)
 echo $res | grep "$name2"
 echo $res | grep "$email"
 echo $res | grep "$desc"
 
 $meqaris --disable "$name2"
 
-res=`$psql -c \
-	"select r_name, r_email, r_description, r_enabled from meqaris.meq_resources where r_email = '$email';"`
+res=$(get_resource_by_email $email)
 echo $res | grep -w "f"
 
 $meqaris --enable "$name2"
 
-res=`$psql -c \
-	"select r_name, r_email, r_description, r_enabled from meqaris.meq_resources where r_email = '$email';"`
+res=$(get_resource_by_email $email)
 echo $res | grep -w "t"
 
 $meqaris --delete "$name2"
 
-res=`$psql -c \
-	"select r_name, r_email, r_description from meqaris.meq_resources;"`
+res=$(get_resources)
 (echo $res | grep "$name2") && exit 1
 
 exit 0
