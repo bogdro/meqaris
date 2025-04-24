@@ -100,6 +100,18 @@ get_event_by_mail_uid()
 	echo "$res"
 }
 
+get_event_by_summary_uid()
+{
+	summary=$1
+	uid=$2
+	res=`$psql -c \
+		"select r_email, e_summary, e_dtstamp, e_uid from meqaris.meq_events \
+		join meqaris.meq_resource_reservations on rr_e_id = e_id \
+		join meqaris.meq_resources on r_id = rr_r_id \
+		where e_summary = '$summary' and e_uid = '$uid';"`
+	echo "$res"
+}
+
 init_l4p_force()
 {
 	cat > $l4p_config <<-L4J

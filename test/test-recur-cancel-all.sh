@@ -60,8 +60,7 @@ check_event_with_subject_and_uid "$subject" "$uid"
 
 # We're cancelling for all attendees, so join with meqaris.meq_resource_reservations
 # to check if there reservations are gone.
-res=`$psql -c \
-	"select r_email, e_summary, e_dtstamp, e_uid from meqaris.meq_events join meqaris.meq_resource_reservations on rr_e_id = e_id join meqaris.meq_resources on r_id = rr_r_id where e_summary = '$subject' and e_uid = '$uid';"`
+res=$(get_event_by_summary_uid "$subject" $uid)
 (echo $res | grep "$subject") && exit 2
 (echo $res | grep "$uid") && exit 3
 (echo $res | grep "$resource") && exit 4
