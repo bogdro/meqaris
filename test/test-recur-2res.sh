@@ -53,8 +53,7 @@ check_status_code $test_log '2.0'
 
 check_event_with_subject_and_uid "$subject" "$uid"
 
-res=`$psql -c \
-	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id join meqaris.meq_events on e_id = rr_e_id where r_email = '$resource1' and e_uid = '$uid';"`;
+res=$(get_event_by_mail_uid $resource1 $uid)
 echo $res | grep "$year-$month-02 03:45:00"
 echo $res | grep "$year-$month-02 04:00:00"
 echo $res | grep "$year-$month-03 03:45:00"
@@ -70,8 +69,7 @@ echo $res | grep "$year-$month-06 04:00:00"
 (echo $res | grep "$year-$month-07 04:00:00") && exit 2
 echo $res | grep "$resource1"
 
-res=`$psql -c \
-	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id join meqaris.meq_events on e_id = rr_e_id where r_email = '$resource2' and e_uid = '$uid';"`;
+res=$(get_event_by_mail_uid $resource2 $uid)
 echo $res | grep "$year-$month-02 03:45:00"
 echo $res | grep "$year-$month-02 04:00:00"
 echo $res | grep "$year-$month-03 03:45:00"

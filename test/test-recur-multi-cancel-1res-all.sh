@@ -72,8 +72,7 @@ check_event_with_subject_and_uid "$subject" "$uid"
 # We're cancelling for just 1 attendee, so join with meqaris.meq_resource_reservations
 # to check if there remaining reservations are in place.
 # resource1:
-res=`$psql -c \
-	"select rr_interval, r_email from meqaris.meq_resource_reservations join meqaris.meq_resources on r_id = rr_r_id join meqaris.meq_events on e_id = rr_e_id where r_email = '$resource1' and e_uid = '$uid';"`;
+res=$(get_event_by_mail_uid $resource1 $uid)
 echo $res | grep "$year-$month-02 05:00:00"
 echo $res | grep "$year-$month-02 05:15:00"
 echo $res | grep "$year-$month-03 05:00:00"

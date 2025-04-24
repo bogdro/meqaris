@@ -88,6 +88,18 @@ get_reserv_by_email()
 	echo "$res"
 }
 
+get_event_by_mail_uid()
+{
+	mail=$1
+	uid=$2
+	res=`$psql -c \
+		"select rr_interval, r_email from meqaris.meq_resource_reservations \
+		join meqaris.meq_resources on r_id = rr_r_id \
+		join meqaris.meq_events on e_id = rr_e_id \
+		where r_email = '$mail' and e_uid = '$uid';"`;
+	echo "$res"
+}
+
 init_l4p_force()
 {
 	cat > $l4p_config <<-L4J
