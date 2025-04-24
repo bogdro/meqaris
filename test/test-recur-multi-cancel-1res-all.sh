@@ -90,9 +90,8 @@ echo $res | grep "$resource1"
 
 # We're cancelling for just 1 attendee, so join with meqaris.meq_resource_reservations
 # to check if there aren't any actual reservations.
-res=`$psql -c \
-	"select e_summary, e_dtstamp, e_uid from meqaris.meq_events join meqaris.meq_resource_reservations on rr_e_id = e_id join meqaris.meq_resources on r_id = rr_r_id where r_email = '$resource2';"`
-# where e_summary = '$subject' and e_uid = '$uid'
+res=$(get_event_by_mail $resource2)
+
 (echo $res | grep "$uid") && exit 1
 
 if [ -n "$delete_log" ]; then rm -f $test_log; fi
