@@ -21,19 +21,58 @@ are used to invite participants to meetings.
 
 Meqaris supports the following command-line options:
 
+=head2 General options
+
 =over 4
 
-=item B<--add-caldav-resource> I<caldav_server_name> B<--name> I<resource_name>
+=item B<-h|--help|-?>
 
-Assign the CalDAV server with the given name to the meeting resource given in I<--name>.
+Shows the help message.
 
-=item B<--add-caldav-server> I<URL> B<--name> I<caldav_server_name> [B<--user> I<username> B<--password> I<password>] [B<--realm> I<realm_name>]
+=item B<--license|--licence>
 
-Add a CalDAV server with the given URL, setting I<--name> and optional I<--user>, I<--password> and I<--realm>.
+Shows the license information.
+
+=item B<--status>
+
+Shows the operability status of Meqaris.
+
+=item B<--version>
+
+Display Meqaris version information.
+
+=back
+
+=head2 Configuration
+
+=over 4
 
 =item B<--conf> I<file>
 
 Use the given configuration file.
+
+=item B<--destroy-db>
+
+Destroys the Meqaris schema on the database.
+
+=item B<--set> I<name> [B<--value> I<value>]
+
+Specifies the name of the configuration setting to modify.
+
+=item B<--upgrade-db>
+
+Run the necessary Meqaris database structure upgrade scripts.
+
+=item B<--value> I<value>
+
+Specifies the new value of the configuration setting to modify using I<--set>.
+If not provided, the setting is set to I<NULL>.
+
+=back
+
+=head2 Resource management
+
+=over 4
 
 =item B<--create> I<name> B<--email> I<e-mail_address> [B<--description> I<desc>]
 
@@ -43,21 +82,9 @@ Create a new meeting resource.
 
 Delete a meeting resource with the given name.
 
-=item B<--delete-caldav-resource> I<caldav_server_name> B<--name> I<resource_name>
-
-Un-assign the CalDAV server with the given name from the resource given in I<--name>.
-
-=item B<--delete-caldav-server> I<caldav_server_name>
-
-Delete the CalDAV server with the given name.
-
 =item B<--description> I<desc>
 
 Specifies a description for a meeting resource when creating or updating.
-
-=item B<--destroy-db>
-
-Destroys the Meqaris schema on the database.
 
 =item B<--disable> I<name>
 
@@ -71,17 +98,39 @@ Specifies an e-mail address for the meeting resource when creating or updating.
 
 Enables the meeting resource with the given name.
 
-=item B<-h|--help|-?>
+=item B<--name> I<name>
 
-Shows the help message.
+Specifies a new name for the meeting resource.
 
-=item B<--license|licence>
+=item B<--update> I<name> [B<--name> I<new_resource_name>] [B<--email> I<new_e-mail_address>] [B<--description> I<new_description>]
 
-Shows the license information.
+Update a meeting resource with the given name.
+
+=back
+
+=head2 CalDAV management
+
+=over 4
+
+=item B<--add-caldav-resource> I<caldav_server_name> B<--name> I<resource_name>
+
+Assign the CalDAV server with the given name to the meeting resource given in I<--name>.
+
+=item B<--add-caldav-server> I<URL> B<--name> I<caldav_server_name> [B<--user> I<username> B<--password> I<password>] [B<--realm> I<realm_name>]
+
+Add a CalDAV server with the given URL, setting I<--name> and optional I<--user>, I<--password> and I<--realm>.
+
+=item B<--delete-caldav-resource> I<caldav_server_name> B<--name> I<resource_name>
+
+Un-assign the CalDAV server with the given name from the resource given in I<--name>.
+
+=item B<--delete-caldav-server> I<caldav_server_name>
+
+Delete the CalDAV server with the given name.
 
 =item B<--name> I<name>
 
-Specifies a new name for the meeting resource or CalDAV server.
+Specifies the name for the CalDAV server or the resource.
 
 =item B<--password> I<password>
 
@@ -91,25 +140,9 @@ Specifies a password when creating or updating a CalDAV server.
 
 Specifies a realm when creating or updating a CalDAV server.
 
-=item B<--set> I<name>
-
-Specifies the name of the configuration setting to modify.
-
-=item B<--status>
-
-Shows the operability status of Meqaris.
-
-=item B<--update> I<name> [B<--name> I<new_resource_name>] [B<--email> I<new_e-mail_address>] [B<--description> I<new_description>]
-
-Update a meeting resource with the given name.
-
 =item B<--update-caldav-server> I<caldav_server_name> [B<--url> I<new_URL>] [B<--name> I<new_server_name>] [B<--user> I<new_username> B<--password> I<new_password>] [B<--realm> I<new_realm_name>]
 
 Update a CalDAV server with a new I<--url> / I<--name> / I<--user> / I<--password> / I<--realm>
-
-=item B<--upgrade-db>
-
-Run the necessary Meqaris database structure upgrade scripts.
 
 =item B<--url> I<URL>
 
@@ -118,15 +151,6 @@ Specifies an URL for the CalDAV server when updating.
 =item B<--user> I<username>
 
 Specifies a username when creating or updating a CalDAV server.
-
-=item B<--value> I<value>
-
-Specifies the new value of the configuration setting to modify using I<--set>.
-If not provided, the setting is set to I<NULL>.
-
-=item B<--version>
-
-Display Meqaris version information.
 
 =back
 
