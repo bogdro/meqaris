@@ -23,7 +23,7 @@
 #
 # Special names here like {__make} come from /usr/lib/rpm/macros, /usr/lib/rpm/macros.rpmbuild
 
-%define meq_version 2.0
+%define meq_version 2.1
 %define meq_release 1
 %define meq_name meqaris
 %define meq_url https://meqaris.sourceforge.io

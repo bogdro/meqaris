@@ -1,3 +1,65 @@
+2025-04-25	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
+
+	* Meqaris version 2.1:
+	  Added support for the REQUEST-STATUS property in responses for
+	  automatic processing on client side. Declining more events with
+	  invalid or missing properties or values. Fixed some error paths.
+	  Code simplifications. Improvements in logging. Other small changes.
+	  Many improvements in tests and many new tests. Improvements in the
+	  build system. Improvements in the documentation.
+	* bin/meqaris (main): Re-written the remaining manual insert to a call
+	  to insert_event(). Set common parameters for insert_event() earlier.
+	  Display "not found" when attempting to --set db_version. Limit the
+	  length when logging the iCalendar (to avoid large attachments in the
+	  logs). Decline the event when the method is unsupported. Reset
+	  replied attendees for each event. Decline events with no organiser.
+	  Decline events with no UID.
+	* bin/meqaris (insert_event): Process insertion errors only when
+	  actually inserting and not ignoring the event - this prevents errors
+	  with undefined values.
+	* bin/meqaris (main, send_decline, process_insert_error, insert_event):
+	  Add the REQUEST-STATUS property in responses for automatic processing
+	  on client side.
+	* bin/meqaris (send_mail, send_accept, send_decline, prop_array,
+	  process_insert_error, notify_caldav, db_stmt, db_stmt_print,
+	  db_run_file): Simplified parameter handling.
+	* test/test-init.sh: Allow the initial --destroy-db to fail (for fresh
+	  databases).
+	* test/test-func.bash: Make Perl warnings fatal. Simplified handling
+	  of the 'year' value.
+	* test/test-func.bash, test/*.sh: Allow keeping the logs. Test the
+	  REQUEST-STATUS property in responses where applicable. Moved some
+	  common code to functions in test-func.bash. Pass the UID value as a
+	  parameter to the test scripts and increment after each one. Moved
+	  common SQL queries to functions.
+	* test/test-unsupp-method.sh, test/test-suite.sh: Added a test for
+	  unsupported methods.
+	* test/test-adjacent-events.sh, test/test-suite.sh: Added a test for
+	  adjacent events.
+	* test/test-disabled.sh, test/test-suite.sh: Added a test for
+	  disabled resources.
+	* test/test-no-organiser.sh, test/test-suite.sh: Added a test for
+	  events without an organiser.
+	* test/test-cancel-no-exist.sh, test/test-suite.sh: Added a test for
+	  cancelling events which don't exist.
+	* test/test-multi-same-res.sh, test/test-suite.sh: Added a test for
+	  events with the same resource specified twice.
+	* test/test-multi-res-unkn.sh, test/test-suite.sh: Added a test for
+	  an event sent to an unknown resource.
+	* test/test-no-uid.sh, test/test-suite.sh: Added a test for events
+	  without a UID.
+	* test/create-mail: Support creating test events without an organiser
+	  or a UID.
+	* docker/Dockerfile-meqaris-db: Use a specified database version
+	  instead of "latest". Switch user to non-privileged.
+	* Makefile: Remove test configuration files and logs when packaging.
+	* manual/en/install.html: Fixed starting Cyrus IMAP.
+	* manual/en/*.html: Fix HTML tags. Other small fixes.
+	* meqaris.pod: Rearranged the options into sections.
+	* README, README.md, manual/en/readme.html: Updated compatibility.
+	* bin/meqaris, sql/*, scripts/*, docker/*, meqaris.spec, test/*,
+	  Makefile: Updated or added copyright blocks.
+
 2023-05-15	Bogdan Drozdowski <bogdro /AT/ users . sourceforge . net>
 
 	* Meqaris version 2.0:

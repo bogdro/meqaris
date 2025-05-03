@@ -205,7 +205,7 @@ connection time-out value, in seconds.
 
 =head1 VERSION
 
-Version 2.0
+Version 2.1
 
 =head1 LICENSE
 
